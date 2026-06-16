@@ -60,17 +60,3 @@ aws s3 cp "${DUMP_FILE}" "s3://${BACKUP_BUCKET}/${S3_KEY}" \
   --storage-class STANDARD_IA
 
 log "DB backup complete: s3://${BACKUP_BUCKET}/${S3_KEY}"
-
-# Prune local copy is already handled by trap; prune old S3 objects (keep 30 days)
-log "Pruning S3 daily backups older than 30 days …"
-CUTOFF=$(date -u -d "30 days ago" +%Y-%m-%d 2>/dev/null || \
-         date -u -v-30d +%Y-%m-%d 2>/dev/null || true)
-if [ -n "${CUTOFF}" ]; then
-  aws s3 ls "s3://${BACKUP_BUCKET}/backups/daily/" --recursive --region "${AWS_REGION}" | \
-  awk -v cutoff="${CUTOFF}" '$1 < cutoff {print $4}' | \
-  while read -r key; do
-    aws s3 rm "s3://${BACKUP_BUCKET}/${key}" --region "${AWS_REGION}" --quiet
-    log "  Removed old backup: ${key}"
-  done
-fi
-
