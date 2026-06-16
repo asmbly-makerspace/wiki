@@ -1,0 +1,204 @@
+name: Build MediaWiki AMI
+
+on:
+  push:
+    tags:
+      - 'ami/v*'       # e.g. ami/v1.43.0
+  workflow_dispatch:   # manual trigger from the Actions UI
+    inputs:
+      mediawiki_version:
+        description: 'MediaWiki version to build (e.g. 1.43.0)'
+        required: false
+        default: '1.43.0'
+      dry_run:
+        description: 'Validate only — do not build the AMI'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # needed to annotate the tag with the AMI ID
+  id-token: write   # needed for OIDC AWS auth (if used)
+
+env:
+  # These are set from GitHub Secrets; see PLAN.md → Secrets Reference
+  AWS_REGION:        ${{ secrets.AWS_REGION }}
+  PACKER_VPC_ID:     ${{ secrets.PACKER_VPC_ID }}
+  PACKER_SUBNET_ID:  ${{ secrets.PACKER_SUBNET_ID }}
+  BACKUP_BUCKET:     ${{ secrets.BACKUP_BUCKET }}
+
+jobs:
+  validate:
+    name: Packer Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: '1.11.0'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Packer Init
+        working-directory: packer
+        run: packer init .
+
+      - name: Packer Validate
+        working-directory: packer
+        env:
+          PKR_VAR_aws_region:      ${{ env.AWS_REGION }}
+          PKR_VAR_vpc_id:          ${{ env.PACKER_VPC_ID }}
+          PKR_VAR_subnet_id:       ${{ env.PACKER_SUBNET_ID }}
+          PKR_VAR_mw_db_password:  ${{ secrets.MW_DB_PASSWORD }}
+          PKR_VAR_mw_secret_key:   ${{ secrets.MW_SECRET_KEY }}
+          PKR_VAR_mw_upgrade_key:  ${{ secrets.MW_UPGRADE_KEY }}
+        run: |
+          packer validate \
+            -var "mediawiki_version=${{ inputs.mediawiki_version || '1.43.0' }}" \
+            mediawiki.pkr.hcl
+
+  build:
+    name: Build AMI
+    needs: validate
+    runs-on: ubuntu-latest
+    # Skip the actual build on dry-run
+    if: ${{ inputs.dry_run != true }}
+    outputs:
+      ami_id: ${{ steps.build.outputs.ami_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: '1.11.0'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Packer Init
+        working-directory: packer
+        run: packer init .
+
+      - name: Determine MediaWiki version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Extract from tag: ami/v1.43.0 → 1.43.0
+            VERSION="${GITHUB_REF_NAME#ami/v}"
+          else
+            VERSION="${{ inputs.mediawiki_version || '1.43.0' }}"
+          fi
+          echo "mw_version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building MediaWiki ${VERSION}"
+
+      - name: Packer Build
+        id: build
+        working-directory: packer
+        env:
+          PKR_VAR_aws_region:        ${{ env.AWS_REGION }}
+          PKR_VAR_vpc_id:            ${{ env.PACKER_VPC_ID }}
+          PKR_VAR_subnet_id:         ${{ env.PACKER_SUBNET_ID }}
+          PKR_VAR_mw_db_password:    ${{ secrets.MW_DB_PASSWORD }}
+          PKR_VAR_mw_secret_key:     ${{ secrets.MW_SECRET_KEY }}
+          PKR_VAR_mw_upgrade_key:    ${{ secrets.MW_UPGRADE_KEY }}
+          PACKER_LOG:                "1"
+          PACKER_LOG_PATH:           "/tmp/packer.log"
+        run: |
+          set -euo pipefail
+          mkdir -p ../output
+
+          packer build \
+            -color=false \
+            -timestamp-ui \
+            -var "mediawiki_version=${{ steps.version.outputs.mw_version }}" \
+            mediawiki.pkr.hcl | tee /tmp/packer-build.log
+
+          # Parse the AMI ID from the Packer output
+          AMI_ID=$(grep -oP 'ami-[a-f0-9]+' /tmp/packer-build.log | tail -1)
+          echo "ami_id=${AMI_ID}" >> "$GITHUB_OUTPUT"
+          echo "AMI_ID=${AMI_ID}" >> "$GITHUB_ENV"
+          echo "Built AMI: ${AMI_ID}"
+
+      - name: Upload Packer manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packer-manifest
+          path: |
+            output/packer-manifest.json
+            /tmp/packer-build.log
+            /tmp/packer.log
+          retention-days: 90
+
+      - name: Annotate tag with AMI ID
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ami/') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "MediaWiki ${{ steps.version.outputs.mw_version }} AMI" \
+            --notes "AMI ID: \`${{ steps.build.outputs.ami_id }}\`
+          Region: \`${{ env.AWS_REGION }}\`
+          MediaWiki: \`${{ steps.version.outputs.mw_version }}\`
+          Built: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          " \
+            output/packer-manifest.json 2>/dev/null || \
+          gh release edit "${{ github.ref_name }}" \
+            --notes "AMI ID: \`${{ steps.build.outputs.ami_id }}\`
+          Region: \`${{ env.AWS_REGION }}\`
+          MediaWiki: \`${{ steps.version.outputs.mw_version }}\`
+          Built: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          " 2>/dev/null || true
+
+      - name: Write job summary
+        run: |
+          {
+            echo "## ✅ MediaWiki AMI Build Complete"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| AMI ID | \`${{ steps.build.outputs.ami_id }}\` |"
+            echo "| Region | \`${{ env.AWS_REGION }}\` |"
+            echo "| MediaWiki | \`${{ steps.version.outputs.mw_version }}\` |"
+            echo "| Git ref | \`${{ github.ref_name }}\` |"
+            echo ""
+            echo "### Next steps"
+            echo "1. Launch an EC2 instance from this AMI"
+            echo "2. Attach an IAM instance profile with S3 read access to \`${{ env.BACKUP_BUCKET }}\`"
+            echo "1. Launch a t4g.medium EC2 instance from this AMI in us-east-2"
+            echo "2. Attach an IAM instance profile with S3 read/write access to \`${{ env.BACKUP_BUCKET }}\`"
+            echo "3. SSH in and restore data:"
+            echo "   \`\`\`"
+            echo "   sudo BACKUP_BUCKET=${{ env.BACKUP_BUCKET }} bash /opt/mediawiki-ami/restore/restore.sh"
+            echo "   sudo bash /opt/mediawiki-ami/restore/upgrade-1.35-to-1.43.sh"
+            echo "   \`\`\`"
+            echo "4. Validate, then move the Elastic IP to cut over"
+  notify-failure:
+    name: Notify on failure
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Write failure summary
+        run: |
+          {
+            echo "## ❌ MediaWiki AMI Build FAILED"
+            echo ""
+            echo "Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
+          } >> "$GITHUB_STEP_SUMMARY"
+

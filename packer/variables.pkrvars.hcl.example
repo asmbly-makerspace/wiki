@@ -1,0 +1,27 @@
+# variables.pkrvars.hcl.example
+# Copy this file to variables.auto.pkrvars.hcl (git-ignored) and fill in values.
+# Sensitive values should be injected as environment variables instead:
+#   export PKR_VAR_mw_db_password="$(aws secretsmanager get-secret-value ...)"
+
+aws_region        = "us-east-2"
+vpc_id            = "vpc-0123456789abcdef0"
+subnet_id         = "subnet-0123456789abcdef0"
+ami_name_prefix   = "mediawiki"
+mediawiki_version = "1.43.0"
+php_version       = "8.3"
+instance_type     = "t4g.medium"
+mw_db_name        = "mediawiki"
+mw_db_user        = "wiki"
+backup_bucket     = "my-mediawiki-backups"
+
+# Set ALL of these via env vars — DO NOT commit real secrets:
+# mw_db_password      = "..."   # openssl rand -hex 24
+# mw_secret_key       = "..."   # openssl rand -hex 64
+# mw_upgrade_key      = "..."   # openssl rand -hex 16
+# mw_smtp_password    = "..."   # Gmail app password — ROTATE from old value
+# mw_discourse_secret = "..."   # Discourse SSO secret — ROTATE from old value
+
+extra_tags = {
+  Environment = "production"
+  Team        = "asmbly"
+}
