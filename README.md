@@ -2,8 +2,6 @@
 
 Tooling to **back up** an existing MediaWiki 1.35 server and **build a new AWS AMI** running MediaWiki 1.43 on Amazon Linux 2025 (aarch64 / Graviton).
 
-See **[PLAN.md](PLAN.md)** for the full phase-by-phase upgrade plan and **[docs/s3-backup-setup.md](docs/s3-backup-setup.md)** for S3 bucket configuration.
-
 ---
 
 ## Prerequisites
@@ -150,10 +148,6 @@ via `/etc/cron.d/mediawiki-backup`. It uploads to S3 with GFS rotation:
 | Weekly | Sundays | `backups/weekly/YYYY-WNN/` | 57 days (S3 Lifecycle) |
 | Monthly | 1st of month | `backups/monthly/YYYY-MM/` | 366 days (S3 Lifecycle) |
 
-The GitHub Actions scheduled workflow (`scheduled-backup.yml`) was used to back up
-the **old** server during the migration window. After cutover it can be disabled —
-the new server backs itself up via cron.
-
 ---
 
 ## Repository layout
@@ -193,14 +187,10 @@ scripts/
 
 .github/workflows/
   build-ami.yml           Packer build on tag push / manual dispatch
-  scheduled-backup.yml    Nightly backup of OLD server (disable after cutover)
 
 output/
   info.txt                Inventory captured from the existing 1.35 server
 ```
-
-> ⚠ `scripts/restore/restore-and-upgrade.sh.bak` — the old combined restore+upgrade
-> script, archived for reference. It can be deleted once the migration is complete.
 
 ---
 

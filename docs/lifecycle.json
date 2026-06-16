@@ -4,7 +4,7 @@
       "ID": "mediawiki-daily-expire",
       "Filter": { "Prefix": "backups/daily/" },
       "Status": "Enabled",
-      "Expiration": { "Days": 2 }
+      "Expiration": { "Days": 5 }
     },
     {
       "ID": "mediawiki-weekly-tier",

@@ -63,10 +63,10 @@ otherwise run inside the backup script.
 
 ### Retention summary
 
-| Tier | Prefix | Uploaded when | S3 Lifecycle behaviour |
-|------|--------|--------------|------------------------|
-| Daily | `backups/daily/` | Every night | Expire after **2 days** |
-| Weekly | `backups/weekly/YYYY-WNN/` | Every Sunday | → STANDARD_IA after 14d → expire after **57 days** (~8 weeks) |
+| Tier | Prefix | Uploaded when | S3 Lifecycle behaviour                                                                  |
+|------|--------|--------------|-----------------------------------------------------------------------------------------|
+| Daily | `backups/daily/` | Every night | Expire after **5 days**                                                                 |
+| Weekly | `backups/weekly/YYYY-WNN/` | Every Sunday | → STANDARD_IA after 14d → expire after **57 days** (~8 weeks)                           |
 | Monthly | `backups/monthly/YYYY-MM/` | 1st of month | → STANDARD_IA after 30d → GLACIER_IR after 90d → expire after **366 days** (~12 months) |
 
 ### Apply with AWS CLI
@@ -90,7 +90,7 @@ aws s3api get-bucket-lifecycle-configuration --bucket "${BACKUP_BUCKET}"
 
 ## Step 5 — IAM policy for the EC2 instance profile
 
-The instance needs permission to read, write, and delete within the backup prefix.
+The instance needs permission to read and write within the backup prefix.
 Attach the following inline policy to the instance's IAM role (replace
 `my-mediawiki-backups` with your actual bucket name):
 
@@ -104,7 +104,6 @@ Attach the following inline policy to the instance's IAM role (replace
       "Action": [
         "s3:PutObject",
         "s3:GetObject",
-        "s3:DeleteObject",
         "s3:ListBucket"
       ],
       "Resource": [
