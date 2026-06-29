@@ -86,12 +86,33 @@ LSETTINGS="${MW_ROOT}/LocalSettings.php"
 [ -f "${LSETTINGS}" ] || fail "LocalSettings.php not found at ${LSETTINGS}"
 
 extract_setting() {
-  php -r "require '${LSETTINGS}'; \$r='${1}'; if(isset(\$\$r)) echo \$\$r;" 2>/dev/null || true
+  # Parse a literal assignment from LocalSettings.php without executing PHP code.
+  local varname="$1" phpfile="$2"
+  php -r '
+    $var = $argv[1];
+    $file = $argv[2];
+    $src = @file_get_contents($file);
+    if ($src === false) exit(0);
+
+    $pattern = "/^[ \t]*\\$" . preg_quote($var, "/") . "[ \t]*=[ \t]*([\"\\x27])(.*?)(?<!\\\\)\\1[ \t]*;/m";
+    if (!preg_match($pattern, $src, $m)) exit(0);
+
+    $quote = $m[1];
+    $value = $m[2];
+
+    if ($quote === "\"") {
+      $value = stripcslashes($value);
+    } else {
+      $value = str_replace(["\\\\", "\\" . chr(39)], ["\\", chr(39)], $value);
+    }
+
+    echo $value;
+  ' "$varname" "$phpfile" 2>/dev/null || true
 }
-MW_DB_NAME="${MW_DB_NAME:-$(extract_setting wgDBname)}"
-MW_DB_USER="${MW_DB_USER:-$(extract_setting wgDBuser)}"
-MW_DB_PASS="${MW_DB_PASS:-$(extract_setting wgDBpassword)}"
-MW_DB_HOST="${MW_DB_HOST:-$(extract_setting wgDBserver)}"
+MW_DB_NAME="${MW_DB_NAME:-$(extract_setting wgDBname "${LSETTINGS}")}"
+MW_DB_USER="${MW_DB_USER:-$(extract_setting wgDBuser "${LSETTINGS}")}"
+MW_DB_PASS="${MW_DB_PASS:-$(extract_setting wgDBpassword "${LSETTINGS}")}"
+MW_DB_HOST="${MW_DB_HOST:-$(extract_setting wgDBserver "${LSETTINGS}")}"
 MW_DB_HOST="${MW_DB_HOST:-localhost}"
 [ -n "${MW_DB_NAME}" ] || fail "Could not determine DB name from LocalSettings.php"
 log "Target DB: ${MW_DB_USER}@${MW_DB_HOST}/${MW_DB_NAME}"
@@ -169,4 +190,3 @@ log "  Images: ${MW_ROOT}/images/"
 log ""
 log "If this was a restore of 1.35 data onto a 1.43 AMI, run next:"
 log "  sudo bash /opt/mediawiki-ami/restore/upgrade-1.35-to-1.43.sh"
-

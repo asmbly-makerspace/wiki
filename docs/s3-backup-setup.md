@@ -91,8 +91,7 @@ aws s3api get-bucket-lifecycle-configuration --bucket "${BACKUP_BUCKET}"
 ## Step 5 — IAM policy for the EC2 instance profile
 
 The instance needs permission to read and write within the backup prefix.
-Attach the following inline policy to the instance's IAM role (replace
-`my-mediawiki-backups` with your actual bucket name):
+Attach the following inline policy to the instance's IAM role:
 
 ```json
 {
