@@ -15,7 +15,7 @@ sudo bash scripts/inventory/gather-info.sh | tee output/server-inventory.txt
 
 export BACKUP_BUCKET=my-mediawiki-backups
 export AWS_REGION=us-east-2
-sudo bash scripts/backup/full-backup.sh
+bash scripts/backup/full-backup.sh
 ```
 
 The full backup uploads DB dump + images + config to `s3://$BACKUP_BUCKET/backups/<timestamp>/`.
@@ -196,10 +196,12 @@ output/
 
 ## Required GitHub Secrets
 
+See [docs/iam/README.md](docs/iam/README.md) for the full IAM setup guide,
+including a minimal IAM policy, CLI setup scripts, and a recommended OIDC
+role that eliminates the need for long-lived access keys entirely.
+
 | Secret | Description |
 |--------|-------------|
-| `AWS_ACCESS_KEY_ID` | IAM key for Packer + S3 |
-| `AWS_SECRET_ACCESS_KEY` | IAM secret |
 | `AWS_REGION` | `us-east-2` |
 | `PACKER_VPC_ID` | VPC for Packer builder instance |
 | `PACKER_SUBNET_ID` | Public subnet for Packer builder |
@@ -209,6 +211,4 @@ output/
 | `MW_SMTP_PASSWORD` | Gmail app password for notification@asmbly.org ⚠ rotate |
 | `MW_DISCOURSE_SECRET` | Discourse SSO shared secret ⚠ rotate |
 | `BACKUP_BUCKET` | S3 bucket name for backups |
-| `PROD_HOST` | Hostname/IP of old production server (scheduled backup only) |
-| `EC2_SSH_KEY` | SSH private key for old production server (scheduled backup only) |
 
