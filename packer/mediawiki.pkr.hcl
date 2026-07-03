@@ -12,7 +12,7 @@ packer {
 data "amazon-ami" "amazon_linux_2025" {
   region = var.aws_region
   filters = {
-    name                = "al2025-ami-2025.*-kernel-*-arm64"
+    name                = "al2025-ami-*-kernel-*-arm64"
     root-device-type    = "ebs"
     virtualization-type = "hvm"
     architecture        = "arm64"
