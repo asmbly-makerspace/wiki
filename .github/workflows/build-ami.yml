@@ -57,6 +57,7 @@ jobs:
         run: |
           packer validate \
             -var "mediawiki_version=${{ inputs.mediawiki_version || '1.43.0' }}" \
+            -var-file=variables.pkr.hcl \
             mediawiki.pkr.hcl
 
   build:
@@ -121,6 +122,7 @@ jobs:
             -color=false \
             -timestamp-ui \
             -var "mediawiki_version=${{ steps.version.outputs.mw_version }}" \
+            -var-file=variables.pkr.hcl \
             mediawiki.pkr.hcl | tee /tmp/packer-build.log
 
           # Parse the AMI ID from the Packer output
