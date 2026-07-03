@@ -20,13 +20,6 @@ permissions:
   contents: write   # needed to annotate the tag with the AMI ID
   id-token: write   # needed for OIDC AWS auth (if used)
 
-env:
-  # These are set from GitHub Secrets; see PLAN.md → Secrets Reference
-  AWS_REGION:        ${{ env.AWS_REGION }}
-  PACKER_VPC_ID:     ${{ secrets.PACKER_VPC_ID }}
-  PACKER_SUBNET_ID:  ${{ secrets.PACKER_SUBNET_ID }}
-  BACKUP_BUCKET:     ${{ secrets.BACKUP_BUCKET }}
-
 jobs:
   validate:
     name: Packer Validate
@@ -43,8 +36,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNTID }}:role/GitHubActions-PackerMediaWiki
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNTID }}:role/GitHubActions-PackerMediaWiki
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Packer Init
         working-directory: packer
@@ -53,7 +46,7 @@ jobs:
       - name: Packer Validate
         working-directory: packer
         env:
-          PKR_VAR_aws_region:      ${{ env.AWS_REGION }}
+          PKR_VAR_aws_region:      ${{ vars.AWS_REGION }}
           PKR_VAR_vpc_id:          ${{ secrets.PACKER_VPC_ID }}
           PKR_VAR_subnet_id:       ${{ secrets.PACKER_SUBNET_ID }}
           PKR_VAR_mw_db_password:  ${{ secrets.MW_DB_PASSWORD }}
@@ -85,8 +78,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNTID }}:role/GitHubActions-PackerMediaWiki
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNTID }}:role/GitHubActions-PackerMediaWiki
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Packer Init
         working-directory: packer
@@ -108,7 +101,7 @@ jobs:
         id: build
         working-directory: packer
         env:
-          PKR_VAR_aws_region:        ${{ env.AWS_REGION }}
+          PKR_VAR_aws_region:        ${{ vars.AWS_REGION }}
           PKR_VAR_vpc_id:            ${{ secrets.PACKER_VPC_ID }}
           PKR_VAR_subnet_id:         ${{ secrets.PACKER_SUBNET_ID }}
           PKR_VAR_mw_db_password:    ${{ secrets.MW_DB_PASSWORD }}
@@ -151,14 +144,14 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "MediaWiki ${{ steps.version.outputs.mw_version }} AMI" \
             --notes "AMI ID: \`${{ steps.build.outputs.ami_id }}\`
-          Region: \`${{ env.AWS_REGION }}\`
+          Region: \`${{ vars.AWS_REGION }}\`
           MediaWiki: \`${{ steps.version.outputs.mw_version }}\`
           Built: $(date -u +%Y-%m-%dT%H:%M:%SZ)
           " \
             output/packer-manifest.json 2>/dev/null || \
           gh release edit "${{ github.ref_name }}" \
             --notes "AMI ID: \`${{ steps.build.outputs.ami_id }}\`
-          Region: \`${{ env.AWS_REGION }}\`
+          Region: \`${{ vars.AWS_REGION }}\`
           MediaWiki: \`${{ steps.version.outputs.mw_version }}\`
           Built: $(date -u +%Y-%m-%dT%H:%M:%SZ)
           " 2>/dev/null || true
@@ -171,18 +164,18 @@ jobs:
             echo "| Field | Value |"
             echo "|-------|-------|"
             echo "| AMI ID | \`${{ steps.build.outputs.ami_id }}\` |"
-            echo "| Region | \`${{ env.AWS_REGION }}\` |"
+            echo "| Region | \`${{ vars.AWS_REGION }}\` |"
             echo "| MediaWiki | \`${{ steps.version.outputs.mw_version }}\` |"
             echo "| Git ref | \`${{ github.ref_name }}\` |"
             echo ""
             echo "### Next steps"
             echo "1. Launch an EC2 instance from this AMI"
-            echo "2. Attach an IAM instance profile with S3 read access to \`${{ env.BACKUP_BUCKET }}\`"
+            echo "2. Attach an IAM instance profile with S3 read access to \`${{ secrets.BACKUP_BUCKET }}\`"
             echo "1. Launch a t4g.medium EC2 instance from this AMI in us-east-2"
-            echo "2. Attach an IAM instance profile with S3 read/write access to \`${{ env.BACKUP_BUCKET }}\`"
+            echo "2. Attach an IAM instance profile with S3 read/write access to \`${{ secrets.BACKUP_BUCKET }}\`"
             echo "3. SSH in and restore data:"
             echo "   \`\`\`"
-            echo "   sudo BACKUP_BUCKET=${{ env.BACKUP_BUCKET }} bash /opt/mediawiki-ami/restore/restore.sh"
+            echo "   sudo BACKUP_BUCKET=${{ secrets.BACKUP_BUCKET }} bash /opt/mediawiki-ami/restore/restore.sh"
             echo "   sudo bash /opt/mediawiki-ami/restore/upgrade-1.35-to-1.43.sh"
             echo "   \`\`\`"
             echo "4. Validate, then move the Elastic IP to cut over"
