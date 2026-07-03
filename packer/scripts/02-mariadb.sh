@@ -8,14 +8,16 @@ MW_DB_USER="${MW_DB_USER:-wiki}"
 MW_DB_PASSWORD="${MW_DB_PASSWORD:?MW_DB_PASSWORD must be set}"
 
 # ── Install MariaDB 10.11 from the official MariaDB repo ──────────────────────
-# AL2025 ships MariaDB 10.5; for 10.11 LTS we add the official repo.
+# AL2023 is RHEL 9-compatible but $releasever resolves to "2023", so we
+# hardcode the RHEL 9 repo path.
 cat > /etc/yum.repos.d/mariadb.repo << 'EOF'
 [mariadb]
 name = MariaDB 10.11 LTS
-baseurl = https://downloads.mariadb.com/MariaDB/mariadb-10.11/yum/rhel/$releasever/$basearch
-gpgkey = https://downloads.mariadb.com/MariaDB/RPM-GPG-KEY-MariaDB
+baseurl = https://rpm.mariadb.org/10.11/rhel/9/$basearch
+gpgkey = https://rpm.mariadb.org/RPM-GPG-KEY-MariaDB
 gpgcheck = 1
 enabled = 1
+module_hotfixes = 1
 EOF
 
 dnf install -y MariaDB-server MariaDB-client
