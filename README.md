@@ -1,6 +1,6 @@
 # mediawiki-ami
 
-Tooling to **back up** an existing MediaWiki 1.35 server and **build a new AWS AMI** running MediaWiki 1.43 on Amazon Linux 2025 (aarch64 / Graviton).
+Tooling to **back up** an existing MediaWiki 1.35 server and **build a new AWS AMI** running MediaWiki 1.43 on Amazon Linux 2023 (aarch64 / Graviton).
 
 ---
 

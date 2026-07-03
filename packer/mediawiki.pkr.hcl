@@ -9,10 +9,10 @@ packer {
 }
 
 # ── Source AMI lookup ─────────────────────────────────────────────────────────
-data "amazon-ami" "amazon_linux_2025" {
+data "amazon-ami" "amazon_linux_2023" {
   region = var.aws_region
   filters = {
-    name                = "al2025-ami-*-kernel-*-arm64"
+    name                = "al2023-ami-2023.*-kernel-*-arm64"
     root-device-type    = "ebs"
     virtualization-type = "hvm"
     architecture        = "arm64"
@@ -39,7 +39,7 @@ locals {
 # ── Builder ───────────────────────────────────────────────────────────────────
 source "amazon-ebs" "mediawiki" {
   region        = var.aws_region
-  source_ami    = data.amazon-ami.amazon_linux_2025.id
+  source_ami    = data.amazon-ami.amazon_linux_2023.id
   instance_type = var.instance_type
   ssh_username  = "ec2-user"
 
@@ -49,7 +49,7 @@ source "amazon-ebs" "mediawiki" {
   associate_public_ip_address = true
 
   ami_name                = local.ami_name
-  ami_description         = "MediaWiki ${var.mediawiki_version} on Amazon Linux 2025 (arm64) / PHP ${var.php_version}"
+  ami_description         = "MediaWiki ${var.mediawiki_version} on Amazon Linux 2023 (arm64) / PHP ${var.php_version}"
   ami_virtualization_type = "hvm"
 
   launch_block_device_mappings {
