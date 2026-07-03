@@ -9,7 +9,6 @@ dnf update -y --skip-broken
 # ── Essential tools ───────────────────────────────────────────────────────────
 dnf install -y \
   awscli \
-  curl \
   wget \
   git \
   tar \
