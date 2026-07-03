@@ -23,8 +23,8 @@ data "amazon-ami" "amazon_linux_2025" {
 }
 
 locals {
-  timestamp   = formatdate("YYYYMMDDhhmmss", timestamp())
-  ami_name    = "${var.ami_name_prefix}-${var.mediawiki_version}-${local.timestamp}"
+  timestamp = formatdate("YYYYMMDDhhmmss", timestamp())
+  ami_name  = "${var.ami_name_prefix}-${var.mediawiki_version}-${local.timestamp}"
   common_tags = merge(
     {
       Project          = "mediawiki-ami"
@@ -96,10 +96,10 @@ build {
 
   # ── PHP 8.3 ──────────────────────────────────────────────────────────────
   provisioner "shell" {
-    script          = "${path.root}/scripts/01-php.sh"
-    execute_command = "sudo bash '{{ .Path }}'"
+    script           = "${path.root}/scripts/01-php.sh"
+    execute_command  = "sudo bash '{{ .Path }}'"
     environment_vars = ["PHP_VERSION=${var.php_version}"]
-    timeout         = "10m"
+    timeout          = "10m"
   }
 
   # ── MariaDB 10.11 ─────────────────────────────────────────────────────────
@@ -140,10 +140,10 @@ build {
 
   # ── Extensions (Gerrit REL1_43 + GitHub) ─────────────────────────────────
   provisioner "shell" {
-    script          = "${path.root}/scripts/05-extensions.sh"
-    execute_command = "sudo bash '{{ .Path }}'"
+    script           = "${path.root}/scripts/05-extensions.sh"
+    execute_command  = "sudo bash '{{ .Path }}'"
     environment_vars = ["MW_VERSION=${var.mediawiki_version}"]
-    timeout         = "20m"
+    timeout          = "20m"
   }
 
   # ── Finalize / harden ─────────────────────────────────────────────────────
