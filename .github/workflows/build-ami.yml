@@ -22,7 +22,7 @@ permissions:
 
 env:
   # These are set from GitHub Secrets; see PLAN.md → Secrets Reference
-  AWS_REGION:        ${{ secrets.AWS_REGION }}
+  AWS_REGION:        ${{ env.AWS_REGION }}
   PACKER_VPC_ID:     ${{ secrets.PACKER_VPC_ID }}
   PACKER_SUBNET_ID:  ${{ secrets.PACKER_SUBNET_ID }}
   BACKUP_BUCKET:     ${{ secrets.BACKUP_BUCKET }}
@@ -54,8 +54,8 @@ jobs:
         working-directory: packer
         env:
           PKR_VAR_aws_region:      ${{ env.AWS_REGION }}
-          PKR_VAR_vpc_id:          ${{ env.PACKER_VPC_ID }}
-          PKR_VAR_subnet_id:       ${{ env.PACKER_SUBNET_ID }}
+          PKR_VAR_vpc_id:          ${{ secrets.PACKER_VPC_ID }}
+          PKR_VAR_subnet_id:       ${{ secrets.PACKER_SUBNET_ID }}
           PKR_VAR_mw_db_password:  ${{ secrets.MW_DB_PASSWORD }}
           PKR_VAR_mw_secret_key:   ${{ secrets.MW_SECRET_KEY }}
           PKR_VAR_mw_upgrade_key:  ${{ secrets.MW_UPGRADE_KEY }}
@@ -109,8 +109,8 @@ jobs:
         working-directory: packer
         env:
           PKR_VAR_aws_region:        ${{ env.AWS_REGION }}
-          PKR_VAR_vpc_id:            ${{ env.PACKER_VPC_ID }}
-          PKR_VAR_subnet_id:         ${{ env.PACKER_SUBNET_ID }}
+          PKR_VAR_vpc_id:            ${{ secrets.PACKER_VPC_ID }}
+          PKR_VAR_subnet_id:         ${{ secrets.PACKER_SUBNET_ID }}
           PKR_VAR_mw_db_password:    ${{ secrets.MW_DB_PASSWORD }}
           PKR_VAR_mw_secret_key:     ${{ secrets.MW_SECRET_KEY }}
           PKR_VAR_mw_upgrade_key:    ${{ secrets.MW_UPGRADE_KEY }}
