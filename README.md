@@ -66,8 +66,8 @@ export PKR_VAR_mw_discourse_secret="<rotated Discourse SSO secret>"
 
 cd packer
 packer init .
-packer validate -var-file=my.auto.pkrvars.hcl mediawiki.pkr.hcl
-packer build   -var-file=my.auto.pkrvars.hcl mediawiki.pkr.hcl
+packer validate -var-file=my.auto.pkrvars.hcl .
+packer build   -var-file=my.auto.pkrvars.hcl .
 ```
 
 The resulting AMI ID is written to `output/packer-manifest.json`.
