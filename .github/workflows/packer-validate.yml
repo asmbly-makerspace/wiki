@@ -8,7 +8,7 @@ on:
 
 jobs:
   validate:
-    name: packer init & validate (syntax-only)
+    name: packer init & fmt check
     runs-on: ubuntu-latest
 
     # Passed to every step to avoid GitHub API rate-limit errors during
@@ -32,8 +32,9 @@ jobs:
       - name: packer init
         run: packer init .
 
-      # -syntax-only checks HCL grammar without contacting any provider APIs.
-      # No AWS credentials are required.
-      - name: packer validate (syntax only)
-        run: packer validate -syntax-only .
+      # packer fmt -check validates that every .pkr.hcl file in the directory
+      # is parseable and canonically formatted. It never evaluates variables or
+      # calls any provider APIs, so no AWS credentials are required.
+      - name: packer fmt (syntax + format check)
+        run: packer fmt -check .
 
