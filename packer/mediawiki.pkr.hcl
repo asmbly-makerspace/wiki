@@ -86,7 +86,16 @@ build {
 
   provisioner "file" {
     source      = "${path.root}/../scripts/"
-    destination = "/opt/mediawiki-ami/"
+    destination = "/tmp/mediawiki-ami-scripts"
+  }
+
+  provisioner "shell" {
+    inline = [
+      "sudo mkdir -p /opt/mediawiki-ami",
+      "sudo cp -r /tmp/mediawiki-ami-scripts/* /opt/mediawiki-ami/",
+      "sudo chmod -R 755 /opt/mediawiki-ami",
+      "rm -rf /tmp/mediawiki-ami-scripts",
+    ]
   }
 
   # ── System baseline ──────────────────────────────────────────────────────
