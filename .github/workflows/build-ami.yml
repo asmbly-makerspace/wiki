@@ -24,6 +24,9 @@ jobs:
   validate:
     name: Packer Validate
     runs-on: ubuntu-latest
+    env:
+      PACKER_GITHUB_API_TOKEN:
+        ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,6 +64,9 @@ jobs:
     name: Build AMI
     needs: validate
     runs-on: ubuntu-latest
+    env:
+      PACKER_GITHUB_API_TOKEN:
+        ${{ secrets.GITHUB_TOKEN }}
     # Skip the actual build on dry-run
     if: ${{ inputs.dry_run != true }}
     outputs:
