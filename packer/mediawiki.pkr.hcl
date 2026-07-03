@@ -8,27 +8,6 @@ packer {
   }
 }
 
-# ── Variables ─────────────────────────────────────────────────────────────────
-# All variables are declared in variables.pkr.hcl.
-# Override via packer/my.auto.pkrvars.hcl or PKR_VAR_* environment variables.
-
-variable "aws_region"          { type = string }
-variable "vpc_id"              { type = string }
-variable "subnet_id"           { type = string }
-variable "ami_name_prefix"     { type = string  default = "mediawiki" }
-variable "mediawiki_version"   { type = string  default = "1.43.0" }
-variable "php_version"         { type = string  default = "8.3" }
-variable "instance_type"       { type = string  default = "t4g.medium" }
-variable "mw_db_name"          { type = string  default = "mediawiki" }
-variable "mw_db_user"          { type = string  default = "wiki" }
-variable "mw_db_password"      { type = string  sensitive = true }
-variable "mw_secret_key"       { type = string  sensitive = true }
-variable "mw_upgrade_key"      { type = string  sensitive = true }
-variable "mw_smtp_password"    { type = string  sensitive = true  default = "" }
-variable "mw_discourse_secret" { type = string  sensitive = true  default = "" }
-variable "backup_bucket"       { type = string  default = "" }
-variable "extra_tags"          { type = map(string) default = {} }
-
 # ── Source AMI lookup ─────────────────────────────────────────────────────────
 data "amazon-ami" "amazon_linux_2025" {
   region = var.aws_region
