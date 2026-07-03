@@ -57,8 +57,7 @@ jobs:
         run: |
           packer validate \
             -var "mediawiki_version=${{ inputs.mediawiki_version || '1.43.0' }}" \
-            -var-file=variables.pkr.hcl \
-            mediawiki.pkr.hcl
+            .
 
   build:
     name: Build AMI
@@ -122,8 +121,7 @@ jobs:
             -color=false \
             -timestamp-ui \
             -var "mediawiki_version=${{ steps.version.outputs.mw_version }}" \
-            -var-file=variables.pkr.hcl \
-            mediawiki.pkr.hcl | tee /tmp/packer-build.log
+            . | tee /tmp/packer-build.log
 
           # Parse the AMI ID from the Packer output
           AMI_ID=$(grep -oP 'ami-[a-f0-9]+' /tmp/packer-build.log | tail -1)
@@ -175,8 +173,6 @@ jobs:
             echo "| Git ref | \`${{ github.ref_name }}\` |"
             echo ""
             echo "### Next steps"
-            echo "1. Launch an EC2 instance from this AMI"
-            echo "2. Attach an IAM instance profile with S3 read access to \`${{ secrets.BACKUP_BUCKET }}\`"
             echo "1. Launch a t4g.medium EC2 instance from this AMI in us-east-2"
             echo "2. Attach an IAM instance profile with S3 read/write access to \`${{ secrets.BACKUP_BUCKET }}\`"
             echo "3. SSH in and restore data:"
@@ -185,6 +181,8 @@ jobs:
             echo "   sudo bash /opt/mediawiki-ami/restore/upgrade-1.35-to-1.43.sh"
             echo "   \`\`\`"
             echo "4. Validate, then move the Elastic IP to cut over"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   notify-failure:
     name: Notify on failure
     needs: [validate, build]
