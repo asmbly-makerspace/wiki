@@ -60,9 +60,10 @@ source "amazon-ebs" "mediawiki" {
     encrypted             = false
   }
 
-  tags          = local.common_tags
-  run_tags      = local.common_tags
-  snapshot_tags = local.common_tags
+  tags            = local.common_tags
+  run_tags        = local.common_tags
+  run_volume_tags = local.common_tags
+  snapshot_tags   = local.common_tags
 
   temporary_security_group_source_public_ip = true
 }

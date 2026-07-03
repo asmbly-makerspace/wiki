@@ -43,10 +43,7 @@
       "Resource": [
         "arn:aws:ec2:us-east-2:*:security-group/*",
         "arn:aws:ec2:us-east-2:*:vpc/*"
-      ],
-      "Condition": {
-        "StringEquals": { "aws:RequestTag/ManagedBy": "packer" }
-      }
+      ]
     },
     {
       "Sid": "PackerManageSecurityGroup",
@@ -57,10 +54,7 @@
         "ec2:RevokeSecurityGroupIngress",
         "ec2:RevokeSecurityGroupEgress"
       ],
-      "Resource": "arn:aws:ec2:us-east-2:*:security-group/*",
-      "Condition": {
-        "StringEquals": { "aws:ResourceTag/ManagedBy": "packer" }
-      }
+      "Resource": "arn:aws:ec2:us-east-2:*:security-group/*"
     },
     {
       "Sid": "PackerRunInstanceNewResources",
@@ -83,10 +77,7 @@
       "Sid": "PackerRunInstanceOwnedSG",
       "Effect": "Allow",
       "Action": "ec2:RunInstances",
-      "Resource": "arn:aws:ec2:us-east-2:*:security-group/*",
-      "Condition": {
-        "StringEquals": { "aws:ResourceTag/ManagedBy": "packer" }
-      }
+      "Resource": "arn:aws:ec2:us-east-2:*:security-group/*"
     },
     {
       "Sid": "PackerRunInstanceOwnedKeyPair",
