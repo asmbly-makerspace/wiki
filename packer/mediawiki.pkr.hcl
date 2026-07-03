@@ -64,7 +64,6 @@ source "amazon-ebs" "mediawiki" {
   run_tags      = local.common_tags
   snapshot_tags = local.common_tags
 
-  temporary_key_pair_tags                   = local.common_tags
   temporary_security_group_source_public_ip = true
 }
 
