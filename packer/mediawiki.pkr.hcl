@@ -108,7 +108,7 @@ build {
   # ── PHP 8.3 ──────────────────────────────────────────────────────────────
   provisioner "shell" {
     script           = "${path.root}/scripts/01-php.sh"
-    execute_command  = "sudo bash '{{ .Path }}'"
+    execute_command  = "sudo -E bash '{{ .Path }}'"
     environment_vars = ["PHP_VERSION=${var.php_version}"]
     timeout          = "10m"
   }
@@ -116,7 +116,7 @@ build {
   # ── MariaDB 10.11 ─────────────────────────────────────────────────────────
   provisioner "shell" {
     script          = "${path.root}/scripts/02-mariadb.sh"
-    execute_command = "sudo bash '{{ .Path }}'"
+    execute_command = "sudo -E bash '{{ .Path }}'"
     environment_vars = [
       "MW_DB_NAME=${var.mw_db_name}",
       "MW_DB_USER=${var.mw_db_user}",
@@ -135,7 +135,7 @@ build {
   # ── MediaWiki core + LocalSettings.php (envsubst from template) ──────────
   provisioner "shell" {
     script          = "${path.root}/scripts/04-mediawiki.sh"
-    execute_command = "sudo bash '{{ .Path }}'"
+    execute_command = "sudo -E bash '{{ .Path }}'"
     environment_vars = [
       "MW_VERSION=${var.mediawiki_version}",
       "MW_DB_NAME=${var.mw_db_name}",
@@ -152,7 +152,7 @@ build {
   # ── Extensions (Gerrit REL1_43 + GitHub) ─────────────────────────────────
   provisioner "shell" {
     script           = "${path.root}/scripts/05-extensions.sh"
-    execute_command  = "sudo bash '{{ .Path }}'"
+    execute_command  = "sudo -E bash '{{ .Path }}'"
     environment_vars = ["MW_VERSION=${var.mediawiki_version}"]
     timeout          = "20m"
   }
@@ -167,7 +167,7 @@ build {
   # ── Backup cron setup ─────────────────────────────────────────────────────
   provisioner "shell" {
     script          = "${path.root}/scripts/07-backup-setup.sh"
-    execute_command = "sudo bash '{{ .Path }}'"
+    execute_command = "sudo -E bash '{{ .Path }}'"
     environment_vars = [
       "BACKUP_BUCKET=${var.backup_bucket}",
       "AWS_REGION=${var.aws_region}",
