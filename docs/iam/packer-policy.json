@@ -13,9 +13,11 @@
         "ec2:DescribeSecurityGroups",
         "ec2:DescribeInstances",
         "ec2:DescribeInstanceStatus",
+        "ec2:DescribeInstanceTypeOfferings",
         "ec2:DescribeVolumes",
         "ec2:DescribeSnapshots",
-        "ec2:DescribeTags"
+        "ec2:DescribeTags",
+        "ec2:DescribeKeyPairs"
       ],
       "Resource": "*",
       "Condition": {
@@ -26,19 +28,13 @@
       "Sid": "PackerCreateKeyPair",
       "Effect": "Allow",
       "Action": "ec2:CreateKeyPair",
-      "Resource": "arn:aws:ec2:us-east-2:*:key-pair/*",
-      "Condition": {
-        "StringEquals": { "aws:RequestTag/ManagedBy": "packer" }
-      }
+      "Resource": "arn:aws:ec2:us-east-2:*:key-pair/packer_*"
     },
     {
       "Sid": "PackerDeleteKeyPair",
       "Effect": "Allow",
       "Action": "ec2:DeleteKeyPair",
-      "Resource": "arn:aws:ec2:us-east-2:*:key-pair/*",
-      "Condition": {
-        "StringEquals": { "aws:ResourceTag/ManagedBy": "packer" }
-      }
+      "Resource": "arn:aws:ec2:us-east-2:*:key-pair/packer_*"
     },
     {
       "Sid": "PackerCreateSecurityGroup",
@@ -76,22 +72,27 @@
       ],
       "Condition": {
         "StringEquals": {
-          "aws:RequestTag/ManagedBy": "packer",
-          "ec2:InstanceType": "t4g.medium"
+          "aws:RequestTag/ManagedBy": "packer"
+        },
+        "StringLike": {
+          "ec2:InstanceType": "t4g.*"
         }
       }
     },
     {
-      "Sid": "PackerRunInstanceOwnedRefs",
+      "Sid": "PackerRunInstanceOwnedSG",
       "Effect": "Allow",
       "Action": "ec2:RunInstances",
-      "Resource": [
-        "arn:aws:ec2:us-east-2:*:security-group/*",
-        "arn:aws:ec2:us-east-2:*:key-pair/*"
-      ],
+      "Resource": "arn:aws:ec2:us-east-2:*:security-group/*",
       "Condition": {
         "StringEquals": { "aws:ResourceTag/ManagedBy": "packer" }
       }
+    },
+    {
+      "Sid": "PackerRunInstanceOwnedKeyPair",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:us-east-2:*:key-pair/packer_*"
     },
     {
       "Sid": "PackerRunInstanceExternalRefs",
@@ -102,10 +103,7 @@
         "arn:aws:ec2:us-east-2:*:image/*",
         "arn:aws:ec2:us-east-2:*:subnet/*",
         "arn:aws:ec2:us-east-2:*:network-interface/*"
-      ],
-      "Condition": {
-        "StringEquals": { "aws:RequestedRegion": "us-east-2" }
-      }
+      ]
     },
     {
       "Sid": "PackerManageInstance",
@@ -113,7 +111,8 @@
       "Action": [
         "ec2:StopInstances",
         "ec2:TerminateInstances",
-        "ec2:ModifyInstanceAttribute"
+        "ec2:ModifyInstanceAttribute",
+        "ec2:GetPasswordData"
       ],
       "Resource": "arn:aws:ec2:us-east-2:*:instance/*",
       "Condition": {
@@ -127,9 +126,12 @@
         "ec2:CreateImage",
         "ec2:RegisterImage"
       ],
-      "Resource": "arn:aws:ec2:us-east-2:*:image/*",
+      "Resource": "*",
       "Condition": {
-        "StringEquals": { "aws:RequestTag/ManagedBy": "packer" }
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-2",
+          "aws:RequestTag/ManagedBy": "packer"
+        }
       }
     },
     {

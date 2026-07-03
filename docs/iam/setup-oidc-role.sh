@@ -89,7 +89,7 @@ ROLE_ARN=$(aws iam create-role \
 }
 echo "    Role ARN: ${ROLE_ARN}"
 
-# ── 4. Create the permissions policy ────────────────────────────────────────
+# ── 4. Create or update the permissions policy ──────────────────────────────
 echo "==> Creating IAM policy: ${POLICY_NAME}"
 POLICY_ARN=$(aws iam create-policy \
   --policy-name "${POLICY_NAME}" \
@@ -101,7 +101,29 @@ POLICY_ARN=$(aws iam create-policy \
   --output text \
   --no-cli-pager 2>/dev/null) || {
     POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${POLICY_NAME}"
-    echo "    (policy already exists — using ${POLICY_ARN})"
+    echo "    (policy already exists — updating to latest version)"
+    # IAM managed policies retain up to 5 versions; delete the oldest non-default
+    # version if we are at the limit before creating the new default version.
+    OLDEST_NON_DEFAULT=$(aws iam list-policy-versions \
+      --policy-arn "${POLICY_ARN}" \
+      --query "Versions[?IsDefaultVersion==\`false\`] | sort_by(@, &CreateDate) | [0].VersionId" \
+      --output text --no-cli-pager)
+    VERSION_COUNT=$(aws iam list-policy-versions \
+      --policy-arn "${POLICY_ARN}" \
+      --query "length(Versions)" \
+      --output text --no-cli-pager)
+    if [ "${VERSION_COUNT}" -ge 5 ] && [ "${OLDEST_NON_DEFAULT}" != "None" ] && [ -n "${OLDEST_NON_DEFAULT}" ]; then
+      echo "    (removing oldest non-default version ${OLDEST_NON_DEFAULT} to stay within 5-version limit)"
+      aws iam delete-policy-version \
+        --policy-arn "${POLICY_ARN}" \
+        --version-id "${OLDEST_NON_DEFAULT}" \
+        --no-cli-pager
+    fi
+    aws iam create-policy-version \
+      --policy-arn "${POLICY_ARN}" \
+      --policy-document "file://${POLICY_FILE}" \
+      --set-as-default \
+      --no-cli-pager
 }
 echo "    Policy ARN: ${POLICY_ARN}"
 
