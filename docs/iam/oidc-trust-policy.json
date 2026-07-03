@@ -13,12 +13,12 @@
         },
         "StringLike": {
           "token.actions.githubusercontent.com:sub": [
-            "repo:YOUR_GITHUB_ORG/YOUR_REPO_NAME:ref:refs/tags/ami/*",
-            "repo:YOUR_GITHUB_ORG/YOUR_REPO_NAME:workflow_dispatch"
+            "repo:GITHUB_ORG/GITHUB_REPO:ref:refs/tags/ami/*",
+            "repo:GITHUB_ORG/GITHUB_REPO:ref:refs/heads/*",
+            "repo:GITHUB_ORG/GITHUB_REPO:pull_request"
           ]
         }
       }
     }
   ]
 }
-

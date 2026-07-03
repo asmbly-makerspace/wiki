@@ -61,33 +61,13 @@ else
   echo "    OIDC provider already exists: ${EXISTING_PROVIDER}"
 fi
 
-# ── 2. Write the trust policy ────────────────────────────────────────────────
-TRUST_POLICY=$(cat <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
-      },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
-        },
-        "StringLike": {
-          "token.actions.githubusercontent.com:sub": [
-            "repo:${GITHUB_ORG}/${GITHUB_REPO}:ref:refs/tags/ami/*",
-            "repo:${GITHUB_ORG}/${GITHUB_REPO}:workflow_dispatch"
-          ]
-        }
-      }
-    }
-  ]
-}
-EOF
-)
+# ── 2. Build the trust policy from the checked-in template ──────────────────
+TRUST_POLICY_TEMPLATE="$(dirname "$0")/oidc-trust-policy.json"
+TRUST_POLICY=$(sed \
+  -e "s|ACCOUNT_ID|${AWS_ACCOUNT_ID}|g" \
+  -e "s|GITHUB_ORG|${GITHUB_ORG}|g" \
+  -e "s|GITHUB_REPO|${GITHUB_REPO}|g" \
+  "${TRUST_POLICY_TEMPLATE}")
 
 # ── 3. Create the IAM role ───────────────────────────────────────────────────
 echo "==> Creating IAM role: ${ROLE_NAME}"
