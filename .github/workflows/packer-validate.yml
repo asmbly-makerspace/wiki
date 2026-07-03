@@ -1,0 +1,39 @@
+name: Packer Validate
+
+on:
+  push:
+    paths:
+      - "packer/**"
+      - ".github/workflows/packer-validate.yml"
+  pull_request:
+    paths:
+      - "packer/**"
+      - ".github/workflows/packer-validate.yml"
+
+jobs:
+  validate:
+    name: packer init & validate (syntax-only)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: packer
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: "latest"
+
+      # Downloads required plugins. No AWS credentials needed for this step.
+      - name: packer init
+        run: packer init .
+
+      # -syntax-only checks HCL grammar without contacting any provider APIs.
+      # No AWS credentials are required.
+      - name: packer validate (syntax only)
+        run: |
+          packer validate -syntax-only .
+
