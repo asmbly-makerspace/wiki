@@ -255,6 +255,10 @@ if ! command -v composer &>/dev/null; then
   rm -f composer-setup.php
 fi
 
+# Composer 2.2+ blocks plugins unless explicitly allowed.
+# composer/installers is the standard MediaWiki extension install-path plugin.
+composer global config --no-plugins allow-plugins.composer/installers true
+
 for ext_dir in "${EXT_DIR}"/*/; do
   if [ -f "${ext_dir}composer.json" ] && [ ! -d "${ext_dir}vendor" ]; then
     echo "  Running composer install in $(basename "${ext_dir}") …"
