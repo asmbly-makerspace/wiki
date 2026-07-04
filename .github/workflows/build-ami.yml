@@ -48,12 +48,16 @@ jobs:
       - name: Packer Validate
         working-directory: packer
         env:
-          PKR_VAR_aws_region:      ${{ vars.AWS_REGION }}
-          PKR_VAR_vpc_id:          ${{ secrets.PACKER_VPC_ID }}
-          PKR_VAR_subnet_id:       ${{ secrets.PACKER_SUBNET_ID }}
-          PKR_VAR_mw_db_password:  ${{ secrets.MW_DB_PASSWORD }}
-          PKR_VAR_mw_secret_key:   ${{ secrets.MW_SECRET_KEY }}
-          PKR_VAR_mw_upgrade_key:  ${{ secrets.MW_UPGRADE_KEY }}
+          PKR_VAR_aws_region:          ${{ vars.AWS_REGION }}
+          PKR_VAR_vpc_id:              ${{ secrets.PACKER_VPC_ID }}
+          PKR_VAR_subnet_id:           ${{ secrets.PACKER_SUBNET_ID }}
+          PKR_VAR_mw_db_password:      ${{ secrets.MW_DB_PASSWORD }}
+          PKR_VAR_mw_secret_key:       ${{ secrets.MW_SECRET_KEY }}
+          PKR_VAR_mw_upgrade_key:      ${{ secrets.MW_UPGRADE_KEY }}
+          PKR_VAR_mw_smtp_password:    ${{ secrets.MW_SMTP_PASSWORD }}
+          PKR_VAR_mw_discourse_secret: ${{ secrets.MW_DISCOURSE_SECRET }}
+          PKR_VAR_backup_bucket:       ${{ secrets.BACKUP_BUCKET }}
+          PKR_VAR_github_token:        ${{ secrets.GITHUB_TOKEN }}
         run: |
           packer validate \
             -var "mediawiki_version=${{ inputs.mediawiki_version || '1.43.0' }}" \
@@ -105,14 +109,18 @@ jobs:
         id: build
         working-directory: packer
         env:
-          PKR_VAR_aws_region:        ${{ vars.AWS_REGION }}
-          PKR_VAR_vpc_id:            ${{ secrets.PACKER_VPC_ID }}
-          PKR_VAR_subnet_id:         ${{ secrets.PACKER_SUBNET_ID }}
-          PKR_VAR_mw_db_password:    ${{ secrets.MW_DB_PASSWORD }}
-          PKR_VAR_mw_secret_key:     ${{ secrets.MW_SECRET_KEY }}
-          PKR_VAR_mw_upgrade_key:    ${{ secrets.MW_UPGRADE_KEY }}
-          PACKER_LOG:                "1"
-          PACKER_LOG_PATH:           "/tmp/packer.log"
+          PKR_VAR_aws_region:          ${{ vars.AWS_REGION }}
+          PKR_VAR_vpc_id:              ${{ secrets.PACKER_VPC_ID }}
+          PKR_VAR_subnet_id:           ${{ secrets.PACKER_SUBNET_ID }}
+          PKR_VAR_mw_db_password:      ${{ secrets.MW_DB_PASSWORD }}
+          PKR_VAR_mw_secret_key:       ${{ secrets.MW_SECRET_KEY }}
+          PKR_VAR_mw_upgrade_key:      ${{ secrets.MW_UPGRADE_KEY }}
+          PKR_VAR_mw_smtp_password:    ${{ secrets.MW_SMTP_PASSWORD }}
+          PKR_VAR_mw_discourse_secret: ${{ secrets.MW_DISCOURSE_SECRET }}
+          PKR_VAR_backup_bucket:       ${{ secrets.BACKUP_BUCKET }}
+          PKR_VAR_github_token:        ${{ secrets.GITHUB_TOKEN }}
+          PACKER_LOG:                  "1"
+          PACKER_LOG_PATH:             "/tmp/packer.log"
         run: |
           set -euo pipefail
           mkdir -p ../output
