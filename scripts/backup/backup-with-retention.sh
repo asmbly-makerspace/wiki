@@ -22,13 +22,20 @@
 
 set -euo pipefail
 
-# ── Load config ───────────────────────────────────────────────────────────────
+# ── Config ────────────────────────────────────────────────────────────────────
+# Save env-var overrides before sourcing the config file so they aren't
+# clobbered by the (possibly empty) defaults in /etc/sysconfig/mediawiki-backup.
+_ENV_BACKUP_BUCKET="${BACKUP_BUCKET:-}"
+_ENV_AWS_REGION="${AWS_REGION:-}"
+_ENV_MW_ROOT="${MW_ROOT:-}"
+
 CONFIG_FILE="/etc/sysconfig/mediawiki-backup"
 [ -f "${CONFIG_FILE}" ] && source "${CONFIG_FILE}"
 
-BACKUP_BUCKET="${BACKUP_BUCKET:?BACKUP_BUCKET must be set in ${CONFIG_FILE} or environment}"
-AWS_REGION="${AWS_REGION:-us-east-2}"
-MW_ROOT="${MW_ROOT:-/var/www/mediawiki}"
+[[ -n "${_ENV_BACKUP_BUCKET}" ]] && BACKUP_BUCKET="${_ENV_BACKUP_BUCKET}"
+[[ -n "${_ENV_AWS_REGION}" ]]    && AWS_REGION="${_ENV_AWS_REGION}"
+[[ -n "${_ENV_MW_ROOT}" ]]       && MW_ROOT="${_ENV_MW_ROOT}"
+unset _ENV_BACKUP_BUCKET _ENV_AWS_REGION _ENV_MW_ROOT
 
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
 DOW=$(date -u +"%u")           # 1=Mon ... 7=Sun

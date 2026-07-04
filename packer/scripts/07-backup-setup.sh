@@ -32,11 +32,11 @@ chmod 600 /etc/sysconfig/mediawiki-backup
 # ── Install backup cron job ───────────────────────────────────────────────────
 cat > /etc/cron.d/mediawiki-backup << 'EOF'
 # MediaWiki automated backup with GFS retention
-# Runs nightly at 02:00 UTC
+# Runs nightly at 02:00 CDT = 08:00 UTC
 # Edit /etc/sysconfig/mediawiki-backup to configure bucket and retention
 SHELL=/bin/bash
 
-0 2 * * * root /opt/mediawiki-ami/backup/backup-with-retention.sh >> /var/log/mediawiki-backup.log 2>&1
+0 8 * * * root /opt/mediawiki-ami/backup/backup-with-retention.sh >> /var/log/mediawiki-backup.log 2>&1
 EOF
 chmod 644 /etc/cron.d/mediawiki-backup
 

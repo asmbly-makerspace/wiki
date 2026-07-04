@@ -29,6 +29,25 @@ set -euxo pipefail
 
 MW_VERSION="${MW_VERSION:-1.43.0}"
 MW_ROOT="/var/www/mediawiki"
+
+# ── Git safe.directory ────────────────────────────────────────────────────────
+# The MediaWiki tree is owned by apache:apache (set by 04-mediawiki.sh), but
+# this script runs as root.  Git >= 2.35.2 refuses to operate on directories
+# owned by a different user unless they are marked safe.
+git config --global --add safe.directory '*'
+
+# ── GitHub authentication ─────────────────────────────────────────────────────
+# A fine-grained PAT or classic token with read:packages / contents:read scope.
+# Injected by Packer as GITHUB_TOKEN; required to clone private/rate-limited repos.
+: "${GITHUB_TOKEN:?GITHUB_TOKEN must be set}"
+
+# Never fall back to an interactive prompt — fail fast if credentials are wrong.
+export GIT_TERMINAL_PROMPT=0
+
+# Configure a credential helper so every https://github.com/ operation uses the
+# token automatically, without embedding it in each URL.
+git config --global credential.helper \
+  "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN}; }; f"
 EXT_DIR="${MW_ROOT}/extensions"
 SKINS_DIR="${MW_ROOT}/skins"
 MW_BRANCH="REL${MW_VERSION%.*}"                   # e.g. REL1.43  → REL1_43
@@ -47,6 +66,8 @@ GERRIT_EXTENSIONS=(
   "JsonConfig|${MW_BRANCH}|extensions/JsonConfig"
   # Auth framework (required for Discourse SSO)
   "PluggableAuth|${MW_BRANCH}|extensions/PluggableAuth"
+  # Tag cloud widget used on main page
+  "WikiCategoryTagCloud|${MW_BRANCH}|extensions/WikiCategoryTagCloud"
 )
 
 # ── Third-party extensions from GitHub ────────────────────────────────────────
@@ -54,10 +75,8 @@ GERRIT_EXTENSIONS=(
 GITHUB_EXTENSIONS=(
   # Discourse SSO consumer — authenticates wiki users against Discourse
   "DiscourseSsoConsumer|main|https://github.com/centertap/DiscourseSsoConsumer.git"
-  # Tag cloud widget used on main page
-  "WikiCategoryTagCloud|master|https://github.com/DaSchTour/WikiCategoryTagCloud.git"
   # Allows embedding iframes (used for restreamer.asmbly.org)
-  "IFrameTag|master|https://github.com/niclaslindberg/mediawiki-extension-iframetag.git"
+  "IFrameTag|master|https://github.com/hexmode/mediawiki-iframe.git"
 )
 
 # Skins to install alongside Vector (which is bundled)
@@ -75,8 +94,10 @@ clone_or_update() {
     echo "  Updating $(basename "${dest}") …"
     git -C "${dest}" fetch origin "${branch}" --depth=1 2>&1 | tail -2
     git -C "${dest}" checkout "${branch}" 2>/dev/null || git -C "${dest}" checkout -b "${branch}" "origin/${branch}"
-    git -C "${dest}" submodule update --init --recursive --depth=1 2>/dev/null || true
+    git -C "${dest}" submodule update --init --recursive --depth=1
   else
+    # Directory exists but is not a git repo (partial/failed previous run) — wipe it.
+    [ -d "${dest}" ] && { echo "  Removing stale directory $(basename "${dest}") …"; rm -rf "${dest}"; }
     echo "  Cloning $(basename "${dest}") @ ${branch} …"
     git clone ${GIT_CLONE_OPTS} --branch "${branch}" "${url}" "${dest}" 2>&1 | tail -3
   fi
@@ -88,8 +109,7 @@ for entry in "${GERRIT_EXTENSIONS[@]}"; do
   IFS='|' read -r name branch repo_path <<< "${entry}"
   dest="${EXT_DIR}/${name}"
   url="${GERRIT_BASE_URL}/${repo_path}"
-  clone_or_update "${dest}" "${url}" "${branch}" || \
-    echo "  WARNING: Failed to install extension ${name} — skipping"
+  clone_or_update "${dest}" "${url}" "${branch}"
 done
 
 # ── Clone GitHub extensions ───────────────────────────────────────────────────
@@ -97,8 +117,7 @@ echo "Installing GitHub extensions"
 for entry in "${GITHUB_EXTENSIONS[@]}"; do
   IFS='|' read -r name branch url <<< "${entry}"
   dest="${EXT_DIR}/${name}"
-  clone_or_update "${dest}" "${url}" "${branch}" || \
-    echo "  WARNING: Failed to install extension ${name} — skipping"
+  clone_or_update "${dest}" "${url}" "${branch}"
 done
 
 # ── Clone skins ───────────────────────────────────────────────────────────────
@@ -107,8 +126,7 @@ for entry in "${SKINS[@]}"; do
   IFS='|' read -r name branch repo_path <<< "${entry}"
   dest="${SKINS_DIR}/${name}"
   url="${GERRIT_BASE_URL}/${repo_path}"
-  clone_or_update "${dest}" "${url}" "${branch}" || \
-    echo "  WARNING: Failed to install skin ${name} — skipping"
+  clone_or_update "${dest}" "${url}" "${branch}"
 done
 
 # ── Append wfLoadExtension() calls to LocalSettings.php ──────────────────────
@@ -240,8 +258,7 @@ fi
 for ext_dir in "${EXT_DIR}"/*/; do
   if [ -f "${ext_dir}composer.json" ] && [ ! -d "${ext_dir}vendor" ]; then
     echo "  Running composer install in $(basename "${ext_dir}") …"
-    composer install --no-dev --no-interaction --working-dir="${ext_dir}" 2>/dev/null || \
-      echo "  WARNING: composer install failed in $(basename "${ext_dir}")"
+    composer install --no-dev --no-interaction --working-dir="${ext_dir}"
   fi
 done
 

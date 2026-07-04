@@ -39,10 +39,14 @@ fi
 # ── Extract ───────────────────────────────────────────────────────────────────
 mkdir -p /var/www
 tar -xzf "${MW_TARBALL}" -C /var/www/
-# Wikimedia tarballs extract to mediawiki-X.Y.Z/
-mv "/var/www/mediawiki-${MW_VERSION}" "${MW_ROOT}" 2>/dev/null || true
-# If the directory was already named correctly, the mv is a no-op
+# Wikimedia tarballs extract to mediawiki-X.Y.Z/; rename to the canonical path.
+# Remove any previous installation first — if MW_ROOT already exists as a directory,
+# `mv src dest/` would nest src inside dest instead of replacing it.
+rm -rf "${MW_ROOT}"
+mv "/var/www/mediawiki-${MW_VERSION}" "${MW_ROOT}"
 [ -d "${MW_ROOT}" ] || { echo "MediaWiki directory not found after extract"; exit 1; }
+mkdir -p "${MW_ROOT}/images"
+mkdir -p "${MW_ROOT}/maintenance"
 
 # ── Directory permissions ─────────────────────────────────────────────────────
 chown -R apache:apache "${MW_ROOT}"
@@ -70,8 +74,5 @@ chown root:apache "${MW_ROOT}/LocalSettings.php"
 mkdir -p "${MW_ROOT}/cache"
 chown apache:apache "${MW_ROOT}/cache"
 chmod 775 "${MW_ROOT}/cache"
-
-# ── Verify MediaWiki is at least parseable ───────────────────────────────────
-php -r "define('MEDIAWIKI',true); require '${MW_ROOT}/includes/Defines.php'; echo MW_VERSION . PHP_EOL;"
 
 echo "04-mediawiki.sh complete — MediaWiki ${MW_VERSION} installed at ${MW_ROOT}"

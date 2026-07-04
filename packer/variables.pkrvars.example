@@ -20,6 +20,7 @@ backup_bucket     = "my-mediawiki-backups"
 # mw_upgrade_key      = "..."   # openssl rand -hex 16
 # mw_smtp_password    = "..."   # Gmail app password — ROTATE from old value
 # mw_discourse_secret = "..."   # Discourse SSO secret — ROTATE from old value
+# github_token        = "..."   # GitHub PAT, read:contents scope
 
 extra_tags = {
   Environment = "production"

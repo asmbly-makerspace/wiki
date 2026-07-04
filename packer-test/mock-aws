@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# packer/mock-aws — drop-in replacement for the `aws` CLI for local testing.
+# Intercepts `aws s3 cp / ls / rm` and maps S3 URIs to the local filesystem.
+#
+# s3://ANY_BUCKET/key/path  →  ${MOCK_S3_ROOT}/key/path
+# (the bucket name is intentionally discarded — all buckets share one root)
+#
+# MOCK_S3_ROOT defaults to /tmp/mock-s3
+#
+# Installed at /usr/local/bin/aws inside the test container by test-local.sh.
+
+MOCK_S3_ROOT="${MOCK_S3_ROOT:-/tmp/mock-s3}"
+
+# Only intercept s3 sub-commands; pass everything else through silently.
+if [[ "${1:-}" != "s3" ]]; then
+  echo "[mock-aws] (ignored non-s3 command: $*)" >&2
+  exit 0
+fi
+
+shift                            # drop 's3'
+ACTION="${1:-}"; shift           # e.g. cp, ls, rm
+
+# ── Convert s3://BUCKET/KEY  →  MOCK_S3_ROOT/KEY ─────────────────────────────
+s3_to_local() {
+  local uri="$1"
+  if [[ "${uri}" == s3://* ]]; then
+    local path="${uri#s3://}"    # strip s3://
+    path="${path#*/}"            # strip BUCKET/
+    echo "${MOCK_S3_ROOT}/${path}"
+  else
+    echo "${uri}"
+  fi
+}
+
+case "${ACTION}" in
+
+  # ── aws s3 cp SRC DST [flags] ────────────────────────────────────────────────
+  cp)
+    POSITIONAL=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        # known two-argument flags
+        --region|--storage-class|--content-type|--metadata|--sse|--acl|--expected-size)
+          shift 2 ;;
+        # known single-argument flags
+        --recursive|--no-progress|--quiet|--only-show-errors|--no-sign-request|--dryrun)
+          shift ;;
+        # skip any other flag without trying to guess its arity
+        -*) shift ;;
+        *)  POSITIONAL+=("$1"); shift ;;
+      esac
+    done
+
+    SRC="${POSITIONAL[0]:-}"
+    DST="${POSITIONAL[1]:-}"
+    LOCAL_SRC="$(s3_to_local "${SRC}")"
+    LOCAL_DST="$(s3_to_local "${DST}")"
+
+    if   [[ "${DST}" == "-" ]]; then
+      # aws s3 cp s3://... -   →  stream file to stdout (used for latest.txt)
+      cat "${LOCAL_SRC}"
+
+    elif [[ "${SRC}" == "-" ]]; then
+      # aws s3 cp - s3://...   →  write stdin to file (used for latest.txt upload)
+      mkdir -p "$(dirname "${LOCAL_DST}")"
+      cat > "${LOCAL_DST}"
+
+    elif [[ -d "${LOCAL_SRC}" || "${SRC}" == s3://*/  ]]; then
+      # directory / recursive copy
+      mkdir -p "${LOCAL_DST}"
+      cp -a "${LOCAL_SRC}/." "${LOCAL_DST}/"
+
+    else
+      # single file copy
+      mkdir -p "$(dirname "${LOCAL_DST}")"
+      cp "${LOCAL_SRC}" "${LOCAL_DST}"
+    fi
+    ;;
+
+  # ── aws s3 ls [s3://...] ─────────────────────────────────────────────────────
+  ls)
+    LOCAL="$(s3_to_local "${1:-${MOCK_S3_ROOT}}")"
+    ls -lh "${LOCAL}" 2>/dev/null || echo "(empty / not found: ${LOCAL})"
+    ;;
+
+  # ── aws s3 rm s3://... ───────────────────────────────────────────────────────
+  rm)
+    LOCAL="$(s3_to_local "${1:-}")"
+    rm -f "${LOCAL}" 2>/dev/null || true
+    ;;
+
+  *)
+    echo "[mock-aws] s3 ${ACTION}: not implemented in mock (args: $*)" >&2
+    ;;
+esac
+

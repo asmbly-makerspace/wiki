@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # packer/scripts/00-system.sh
-# Phase 0: System baseline for Amazon Linux 2025 (aarch64 / Graviton)
+# Phase 0: System baseline for Amazon Linux 2023 (aarch64 / Graviton)
 set -euxo pipefail
 
 # ── Full system update ────────────────────────────────────────────────────────

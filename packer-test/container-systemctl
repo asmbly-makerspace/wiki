@@ -1,0 +1,94 @@
+#!/bin/bash
+# container-systemctl — drop-in replacement for systemctl in rootless Podman containers.
+#
+# • mariadb / mysql / mysqld  →  starts/stops the daemon directly via mysqld_safe
+# • httpd / apache2           →  starts httpd directly
+# • everything else           →  logs the call and exits 0 (no-op)
+#
+# Installed at /usr/local/bin/systemctl so it shadows the real binary
+# (which doesn't work without systemd anyway).
+
+ACTION="${1:-status}"
+SERVICE="${2:-}"
+
+# ── MariaDB ──────────────────────────────────────────────────────────────────
+
+_mariadb_start() {
+  mysqladmin ping --silent 2>/dev/null && return 0   # already up
+
+  echo "[systemctl-mock] Starting MariaDB directly (no systemd)..."
+
+  # Initialize data directory on first run
+  local datadir="/var/lib/mysql"
+  if [[ ! -f "${datadir}/mysql/global_priv.frm" && \
+        ! -f "${datadir}/mysql/user.frm" && \
+        ! -d "${datadir}/mysql" ]]; then
+    echo "[systemctl-mock] Initializing MariaDB data directory..."
+    mariadb-install-db \
+        --user=mysql \
+        --datadir="${datadir}" \
+        --auth-root-authentication-method=normal \
+        >/dev/null 2>&1 \
+    || mysql_install_db \
+        --user=mysql \
+        --datadir="${datadir}" \
+        >/dev/null 2>&1 \
+    || { echo "[systemctl-mock] ERROR: mariadb data dir init failed" >&2; return 1; }
+  fi
+
+  # Ensure runtime / log dirs exist and are owned by mysql
+  mkdir -p /var/run/mysqld /var/log/mariadb
+  chown mysql:mysql /var/run/mysqld /var/log/mariadb 2>/dev/null || true
+
+  # Start in background; disown so it outlives this script
+  nohup mysqld_safe --user=mysql \
+      >/var/log/mariadb/mysqld_safe.log 2>&1 &
+  disown $!
+
+  # Wait up to 30 s for the socket
+  local i
+  for i in $(seq 1 30); do
+    mysqladmin ping --silent 2>/dev/null && return 0
+    sleep 1
+  done
+  echo "[systemctl-mock] ERROR: MariaDB socket not ready after 30 s" >&2
+  return 1
+}
+
+_mariadb_stop() {
+  mysqladmin shutdown 2>/dev/null || true
+}
+
+# ── httpd ─────────────────────────────────────────────────────────────────────
+
+_httpd_start() {
+  echo "[systemctl-mock] Starting httpd directly (no systemd)..."
+  httpd -k start 2>/dev/null || apachectl start 2>/dev/null || true
+}
+
+_httpd_stop() {
+  httpd -k stop 2>/dev/null || apachectl stop 2>/dev/null || true
+}
+
+# ── Dispatch ──────────────────────────────────────────────────────────────────
+
+case "${ACTION}" in
+  start|restart|reload|"enable --now"|"enable")
+    case "${SERVICE}" in
+      mariadb|mysql|mysqld)  _mariadb_start ;;
+      httpd|apache2)         _httpd_start   ;;
+      *)  echo "[systemctl-mock] ${ACTION} ${SERVICE}" ;;
+    esac
+    ;;
+  stop)
+    case "${SERVICE}" in
+      mariadb|mysql|mysqld)  _mariadb_stop ;;
+      httpd|apache2)         _httpd_stop   ;;
+      *)  echo "[systemctl-mock] stop ${SERVICE}" ;;
+    esac
+    ;;
+  *)
+    echo "[systemctl-mock] $*"
+    ;;
+esac
+

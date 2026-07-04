@@ -37,8 +37,11 @@ log "MW_ROOT: ${MW_ROOT}"
 [ -f "${LSETTINGS}" ] || fail "LocalSettings.php not found — was the AMI built correctly?"
 command -v php >/dev/null || fail "php not found"
 
-# Confirm this is actually a 1.43 AMI before touching anything
-MW_INSTALLED=$(php -r "define('MEDIAWIKI',true); require '${MW_ROOT}/includes/Defines.php'; echo MW_VERSION;" 2>/dev/null || echo "unknown")
+# Confirm this is actually a 1.43 AMI before touching anything.
+# Read the version directly from Defines.php — avoids PHP autoloader issues
+# when running outside the full MediaWiki bootstrap context.
+MW_INSTALLED=$(grep -oP "define\(\s*'MW_VERSION',\s*'\K[^']+" \
+  "${MW_ROOT}/includes/Defines.php" 2>/dev/null || echo "unknown")
 log "Installed MediaWiki version: ${MW_INSTALLED}"
 if [[ "${MW_INSTALLED}" != 1.43* ]]; then
     fail "Expected MediaWiki 1.43.x but found '${MW_INSTALLED}'. Run this only on the new 1.43 AMI."
