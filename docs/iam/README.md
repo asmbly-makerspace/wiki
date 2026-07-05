@@ -176,11 +176,28 @@ and `arn:aws:ec2:us-east-2:*:image/*` (account-owned) to cover both forms.
 Stop, terminate, and modify are restricted to `ResourceTag/ManagedBy=packer`.
 Packer cannot stop or terminate any pre-existing production instance.
 
-**`PackerCreateImage` / `PackerManageImage`**
-`CreateImage` and `RegisterImage` require the new AMI to be tagged at
-creation. `DeregisterImage` and `ModifyImageAttribute` are restricted to
-Packer-tagged AMIs, preventing the credential from deregistering or
-modifying any AMI it did not build.
+**`PackerCreateImageFromInstance` / `PackerCreateImageAMI` / `PackerManageImage`**
+`ec2:CreateImage` is evaluated against **two** resource types simultaneously:
+
+1. The **source instance** (existing resource) — requires `aws:ResourceTag/ManagedBy: packer`
+   to ensure Packer can only image instances it launched itself.
+2. The **new AMI** being created — requires `aws:RequestTag/ManagedBy: packer` to
+   ensure the resulting AMI is always tagged at creation (no untagged AMIs left
+   behind on failure).
+
+A single statement cannot satisfy both because `aws:RequestTag` applies to the
+resource being created and `aws:ResourceTag` applies to the resource already
+existing. Using `aws:RequestTag` alone on `Resource: *` produces a 403 on the
+instance resource — which is the exact failure mode if you collapse these back
+into one statement.
+
+`ec2:RegisterImage` (used when building from a pre-existing snapshot rather
+than a live instance) only touches the `image/*` resource, so it sits in the
+second statement.
+
+`DeregisterImage` and `ModifyImageAttribute` are restricted to
+`ResourceTag/ManagedBy=packer`, preventing the credential from deregistering
+or modifying any AMI it did not build.
 
 **`PackerCreateSnapshot` / `PackerCreateSnapshotFromVolume` / `PackerManageSnapshot`**
 `ec2:CreateSnapshot` operates on two IAM resource types simultaneously — the
