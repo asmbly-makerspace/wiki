@@ -2,36 +2,52 @@
 # packer/scripts/05-extensions.sh
 # Phase 5: Install MediaWiki extensions compatible with 1.43 (REL1_43 branch).
 #
-# EXTENSION STRATEGY:
-#   Many extensions that were separate in MW 1.35 are now BUNDLED with the MW 1.43
-#   tarball and just need wfLoadExtension() — they do NOT need to be git cloned.
+# INSTALLATION STRATEGY:
+#   This script uses Composer (the dependency manager bundled with MediaWiki's
+#   ecosystem) to install extensions, following MediaWiki best practices:
+#     - https://www.mediawiki.org/wiki/Composer/For_extensions
+#     - https://www.mediawiki.org/wiki/Manual:Composer.json_best_practices
 #
-#   Bundled in MW 1.43 (no clone needed):
-#     CategoryTree, Cite, CiteThisPage, CodeEditor, ConfirmEdit, Gadgets,
-#     ImageMap, InputBox, Interwiki, MultimediaViewer,
-#     Nuke, OATHAuth, PageImages, ParserFunctions, PdfHandler, Poem,
-#     ReplaceText, SecureLinkFixer, SpamBlacklist,
-#     SyntaxHighlight_GeSHi, TemplateData, TextExtracts, TitleBlacklist,
-#     VisualEditor, WikiEditor
-#     (also bundled: AbuseFilter, DiscussionTools, Echo, Linter, LoginNotify, Math, Thanks)
+#   Key principle: NEVER modify MediaWiki's composer.json directly.
+#   Instead, extensions are declared in composer.local.json which is merged
+#   automatically by the wikimedia/composer-merge-plugin already configured
+#   in MediaWiki core's composer.json.
 #
-#   Separately installed (Gerrit REL1_43 — verified via git ls-remote):
-#     Scribunto, TemplateStyles, JsonConfig, PluggableAuth, WikiCategoryTagCloud,
-#     Renameuser
-#     NOTE: LocalisationUpdate is ARCHIVED (T309694) — do not use.
+# EXTENSION CATEGORIES:
 #
-#   Third-party (GitHub):
-#     DiscourseSsoConsumer, IFrameTag
+#   Bundled in MW 1.43 (no installation needed — just wfLoadExtension):
+#   AbuseFilter CategoryTree Cite CiteThisPage CodeEditor ConfirmEdit
+#   DiscussionTools Echo Gadgets ImageMap InputBox Interwiki Linter
+#   LoginNotify Math MultimediaViewer Nuke OATHAuth PageImages
+#   ParserFunctions PdfHandler Poem README ReplaceText Scribunto
+#   SecureLinkFixer SpamBlacklist SyntaxHighlight_GeSHi TemplateData
+#   TextExtracts Thanks TitleBlacklist VisualEditor WikiEditor
 #
-# HOW TO FIND THE RIGHT VERSION:
-#   - https://www.mediawiki.org/wiki/Extension:<name>
-#   - Check the "Version matrix" on each extension page
-#   - Use `git ls-remote https://gerrit.wikimedia.org/r/mediawiki/extensions/<Ext> 'refs/heads/REL1_43'`
+#   Installed via Composer (composer.local.json):
+#     DiscourseSsoConsumer (-> PluggableAuth), IFrameTag
+#     TemplateStyles, JsonConfig, PluggableAuth, WikiCategoryTagCloud
+#
+#   NOTE: TemplateStyles, JsonConfig, and WikiCategoryTagCloud are declared as
+#   "package" repositories (not "vcs") in composer.local.json because their
+#   upstream composer.json files lack a "name" field.  Composer's "vcs" driver
+#   requires a name to resolve the package and skips branches without one
+#   ("Unknown package has no name defined").  The "package" type lets us supply
+#   the metadata inline, bypassing that requirement entirely.
+#
+# HOW TO ADD/UPDATE AN EXTENSION:
+#   1. Add a VCS repository entry in config/mediawiki/composer.local.json
+#   2. Add the package "require" line with the correct version constraint
+#   3. For Gerrit extensions: use "dev-REL1_XX" matching the MW branch
+#   4. For tagged releases: use the semver tag (e.g. "5.0.2")
+#   5. Run this script (or `composer update --no-dev` in the MW root)
 
 set -euxo pipefail
 
 MW_VERSION="${MW_VERSION:-1.43.9}"
 MW_ROOT="/var/www/mediawiki"
+EXT_DIR="${MW_ROOT}/extensions"
+MW_BRANCH="REL${MW_VERSION%.*}"                   # e.g. REL1.43  → REL1_43
+MW_BRANCH="${MW_BRANCH//./_}"                      # REL1.43 → REL1_43
 
 # ── Git safe.directory ────────────────────────────────────────────────────────
 # The MediaWiki tree is owned by apache:apache (set by 04-mediawiki.sh), but
@@ -39,9 +55,10 @@ MW_ROOT="/var/www/mediawiki"
 # owned by a different user unless they are marked safe.
 git config --global --add safe.directory '*'
 
-# ── GitHub authentication ─────────────────────────────────────────────────────
+# ── GitHub/Codeberg authentication ───────────────────────────────────────────
 # A fine-grained PAT or classic token with read:packages / contents:read scope.
-# Injected by Packer as GITHUB_TOKEN; required to clone private/rate-limited repos.
+# Injected by Packer as GITHUB_TOKEN; used for rate limiting on public repos
+# and required for any private repositories.
 : "${GITHUB_TOKEN:?GITHUB_TOKEN must be set}"
 
 # Never fall back to an interactive prompt — fail fast if credentials are wrong.
@@ -51,89 +68,96 @@ export GIT_TERMINAL_PROMPT=0
 # token automatically, without embedding it in each URL.
 git config --global credential.helper \
   "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN}; }; f"
-EXT_DIR="${MW_ROOT}/extensions"
-MW_BRANCH="REL${MW_VERSION%.*}"                   # e.g. REL1.43  → REL1_43
-MW_BRANCH="${MW_BRANCH//./_}"                      # REL1.43 → REL1_43
 
-GIT_CLONE_OPTS="--depth=1 --recurse-submodules --shallow-submodules"
+# ── Install Composer ──────────────────────────────────────────────────────────
+# MediaWiki ships composer.json and vendor/ but not the Composer binary itself.
+# Install it globally so we can manage extensions via composer.local.json.
+if ! command -v composer &>/dev/null; then
+  echo "Installing Composer…"
+  php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+  php composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
+  rm -f composer-setup.php
+fi
 
-# ── Extensions from Gerrit (REL1_43 branch) ──────────────────────────────────
-# Array of "ExtensionFolderName|branch_or_tag|gerrit_repo_path"
-GERRIT_EXTENSIONS=(
-  # Lua scripting — required for Infobox/Navbox templates
-  "Scribunto|${MW_BRANCH}|extensions/Scribunto"
-  # Per-template CSS styling
-  "TemplateStyles|${MW_BRANCH}|extensions/TemplateStyles"
-  # JSON data pages (required by Scribunto modules that fetch Commons data)
-  "JsonConfig|${MW_BRANCH}|extensions/JsonConfig"
-  # Auth framework (required for Discourse SSO)
-  "PluggableAuth|${MW_BRANCH}|extensions/PluggableAuth"
-  # Tag cloud widget used on main page
-  "WikiCategoryTagCloud|${MW_BRANCH}|extensions/WikiCategoryTagCloud"
-  # Listed in MW 1.43 docs as bundled but absent from the tarball:
-  "Renameuser|${MW_BRANCH}|extensions/Renameuser"
-  # LocalisationUpdate is ARCHIVED (T309694) — no REL1_43 branch exists. Omitted.
-)
+composer --version
 
-# ── Third-party extensions from GitHub/others ────────────────────────────────────────
-# Array of "ExtensionFolderName|branch|git_url"
-GITHUB_EXTENSIONS=(
-  # Discourse SSO consumer — authenticates wiki users against Discourse
-  "DiscourseSsoConsumer|releases/tag/5.0.2|https://codeberg.org/centertap/DiscourseSsoConsumer.git"
-  # Allows embedding iframes (used for restreamer.asmbly.org)
-  "IFrameTag|releases/tag/1.1.3|https://github.com/hexmode/mediawiki-iframe.git"
-)
+# Composer 2.2+ blocks plugins unless explicitly allowed.
+# These are required by MediaWiki's Composer setup:
+#   - composer/installers: routes packages to extensions/ or skins/ by type
+#   - wikimedia/composer-merge-plugin: merges composer.local.json into resolution
+composer global config --no-plugins allow-plugins.composer/installers true
+composer global config --no-plugins allow-plugins.wikimedia/composer-merge-plugin true
 
-GERRIT_BASE_URL="https://gerrit.wikimedia.org/r/mediawiki"
+# Configure GitHub OAuth token for Composer (avoids rate limiting on API calls).
+composer config --global github-oauth.github.com "${GITHUB_TOKEN}"
 
-# ── Helper: clone or update a repo ───────────────────────────────────────────
-clone_or_update() {
-  local dest="$1" url="$2" branch="$3"
-  if [ -d "${dest}/.git" ]; then
-    echo "  Updating $(basename "${dest}") …"
-    git -C "${dest}" fetch origin "${branch}" --depth=1 2>&1 | tail -2
-    git -C "${dest}" checkout "${branch}" 2>/dev/null || git -C "${dest}" checkout -b "${branch}" "origin/${branch}"
-    git -C "${dest}" submodule update --init --recursive --depth=1
-  else
-    # Directory exists but is not a git repo (partial/failed previous run) — wipe it.
-    [ -d "${dest}" ] && { echo "  Removing stale directory $(basename "${dest}") …"; rm -rf "${dest}"; }
-    echo "  Cloning $(basename "${dest}") @ ${branch} …"
-    git clone ${GIT_CLONE_OPTS} --branch "${branch}" "${url}" "${dest}" 2>&1 | tail -3
+# ── Deploy composer.local.json ────────────────────────────────────────────────
+# The template is committed to the repo at config/mediawiki/composer.local.json
+# and copied to /tmp/ by Packer's file provisioner (same as LocalSettings.php).
+COMPOSER_LOCAL_SRC="/tmp/composer.local.json"
+COMPOSER_LOCAL_DEST="${MW_ROOT}/composer.local.json"
+
+if [ ! -f "${COMPOSER_LOCAL_SRC}" ]; then
+  echo "ERROR: composer.local.json not found at ${COMPOSER_LOCAL_SRC}"
+  echo "Ensure Packer's file provisioner copies config/mediawiki/composer.local.json to /tmp/"
+  exit 1
+fi
+
+cp "${COMPOSER_LOCAL_SRC}" "${COMPOSER_LOCAL_DEST}"
+chown root:apache "${COMPOSER_LOCAL_DEST}"
+chmod 644 "${COMPOSER_LOCAL_DEST}"
+
+# ── Run Composer update ───────────────────────────────────────────────────────
+# This resolves all requirements from composer.local.json:
+#   - Downloads extensions into extensions/ (via composer/installers)
+#   - Resolves PHP library dependencies for each extension
+#   - Updates vendor/autoload.php
+#
+# Flags:
+#   --no-dev          — skip development dependencies (testing, linting, etc.)
+#   --no-interaction  — never prompt; fail on ambiguity
+#   --prefer-dist     — download zip archives instead of full git clones where possible
+#   --optimize-autoloader — generate optimized class maps for production
+echo "Running Composer to install extensions for MediaWiki ${MW_VERSION} (branch ${MW_BRANCH})…"
+cd "${MW_ROOT}"
+
+# Temporarily grant write access for Composer to install into extensions/
+chown -R root:root "${MW_ROOT}"
+
+composer update --no-dev --no-interaction --prefer-dist --optimize-autoloader
+echo "Composer update completed successfully"
+
+EXPECTED_EXTENSIONS=("TemplateStyles" "DiscourseSsoConsumer" "IFrameTag" "PluggableAuth" "JsonConfig" "WikiCategoryTagCloud")
+for ext in "${EXPECTED_EXTENSIONS[@]}"; do
+  if [ ! -d "${EXT_DIR}/${ext}" ]; then
+    echo "ERROR: Expected extension ${ext} not found in ${EXT_DIR}"
+    exit 1
   fi
-}
-
-# ── Clone Gerrit extensions ───────────────────────────────────────────────────
-echo "Installing Gerrit extensions for MediaWiki ${MW_VERSION} (branch ${MW_BRANCH})"
-for entry in "${GERRIT_EXTENSIONS[@]}"; do
-  IFS='|' read -r name branch repo_path <<< "${entry}"
-  dest="${EXT_DIR}/${name}"
-  url="${GERRIT_BASE_URL}/${repo_path}"
-  clone_or_update "${dest}" "${url}" "${branch}"
 done
 
-# ── Clone GitHub extensions ───────────────────────────────────────────────────
-echo "Installing GitHub extensions"
-for entry in "${GITHUB_EXTENSIONS[@]}"; do
-  IFS='|' read -r name branch url <<< "${entry}"
-  dest="${EXT_DIR}/${name}"
-  clone_or_update "${dest}" "${url}" "${branch}"
-done
+# ── Fix ownership ─────────────────────────────────────────────────────────────
+chown -R apache:apache "${EXT_DIR}"
 
+# ── Append extension loading to LocalSettings.php ─────────────────────────────
 LSETTINGS="${MW_ROOT}/LocalSettings.php"
 {
   echo ""
   echo "# === Bundled extensions (shipped with MW 1.43 tarball) ==="
-  echo "# Note: Renameuser is NOT in the 1.43 tarball"
-  echo "# despite documentation — they are cloned via GERRIT_EXTENSIONS above."
+  echo "wfLoadExtension( 'AbuseFilter' );"
   echo "wfLoadExtension( 'CategoryTree' );"
   echo "wfLoadExtension( 'Cite' );"
   echo "wfLoadExtension( 'CiteThisPage' );"
   echo "wfLoadExtension( 'CodeEditor' );"
   echo "wfLoadExtension( 'ConfirmEdit' );"
+  echo "wfLoadExtension( 'DiscussionTools' );"
+  echo "wfLoadExtension( 'Echo' );"
   echo "wfLoadExtension( 'Gadgets' );"
   echo "wfLoadExtension( 'ImageMap' );"
   echo "wfLoadExtension( 'InputBox' );"
   echo "wfLoadExtension( 'Interwiki' );"
+  echo "wfLoadExtension( 'Linter' );"
+  echo "wfLoadExtension( 'LoginNotify' );"
+  echo "wfLoadExtension( 'Math' );"
   echo "wfLoadExtension( 'MultimediaViewer' );"
   echo "wfLoadExtension( 'Nuke' );"
   echo "wfLoadExtension( 'OATHAuth' );"
@@ -147,52 +171,24 @@ LSETTINGS="${MW_ROOT}/LocalSettings.php"
   echo "wfLoadExtension( 'SyntaxHighlight_GeSHi' );"
   echo "wfLoadExtension( 'TemplateData' );"
   echo "wfLoadExtension( 'TextExtracts' );"
+  echo "wfLoadExtension( 'Thanks' );"
   echo "wfLoadExtension( 'TitleBlacklist' );"
   echo "wfLoadExtension( 'VisualEditor' );"
   echo "wfLoadExtension( 'WikiEditor' );"
   echo ""
-  echo "# === Bundled extensions enabled beyond the MW 1.35 baseline ==="
-  echo "# These ship with the MW 1.43 tarball and are safe to enable on first launch."
-  echo ""
-  echo "# Echo — in-wiki notification system (required by DiscussionTools & Thanks)"
-  echo "wfLoadExtension( 'Echo' );"
-  echo ""
-  echo "# DiscussionTools — structured talk pages (replaces legacy talk page UI)"
-  echo "wfLoadExtension( 'DiscussionTools' );"
-  echo ""
-  echo "# Thanks — one-click editor appreciation (requires Echo)"
-  echo "wfLoadExtension( 'Thanks' );"
-  echo ""
   echo "# AbuseFilter — rule-based anti-spam/vandalism filters"
-  echo "wfLoadExtension( 'AbuseFilter' );"
   echo "\$wgAbuseFilterActions = ['throttle' => true, 'warn' => true, 'disallow' => true,"
   echo "    'blockautopromote' => true, 'block' => true, 'tag' => true];"
   echo ""
   echo "# LoginNotify — notifies users of logins from new devices/locations"
-  echo "wfLoadExtension( 'LoginNotify' );"
   echo "\$wgLoginNotifyUseEcho = true;"
   echo ""
-  echo "# Linter — detects deprecated or broken wiki markup"
-  echo "wfLoadExtension( 'Linter' );"
-  echo ""
   echo "# Math — LaTeX formula rendering (useful for electronics/physics pages)"
-  echo "wfLoadExtension( 'Math' );"
   echo "\$wgDefaultUserOptions['math'] = 'mathml';"
   echo ""
-  echo "# === Separately installed extensions ==="
-  for entry in "${GERRIT_EXTENSIONS[@]}" ; do
-    IFS='|' read -r name branch repo_path <<< "${entry}"
-    ext_dir="${EXT_DIR}/${name}"
-    if [ -f "${ext_dir}/extension.json" ]; then
-      echo "wfLoadExtension( '${name}' );"
-    fi
-  done
-  for entry in "${GITHUB_EXTENSIONS[@]}" ; do
-    IFS='|' read -r name branch url <<< "${entry}"
-    ext_dir="${EXT_DIR}/${name}"
-    if [ -f "${ext_dir}/extension.json" ]; then
-      echo "wfLoadExtension( '${name}' );"
-    fi
+  echo "# === Extensions installed via Composer (composer.local.json) ==="
+  for item in "${EXPECTED_EXTENSIONS[@]}"; do
+    echo "wfLoadExtension( '${item}' );"
   done
   echo ""
   echo "# === Skins (all four ship with the MW 1.43 tarball) ==="
@@ -201,7 +197,7 @@ LSETTINGS="${MW_ROOT}/LocalSettings.php"
   echo "wfLoadSkin( 'Timeless' );"
   echo "wfLoadSkin( 'MinervaNeue' );"
   echo ""
-  echo "# === Separately installed extensions ==="
+  echo "# === Extension configuration ==="
   echo ""
   echo "# Scribunto (Lua)"
   echo "\$wgScribuntoDefaultEngine = 'luastandalone';"
@@ -260,25 +256,5 @@ LSETTINGS="${MW_ROOT}/LocalSettings.php"
   echo "# \$wgPluggableAuth_ButtonLabelMessage = 'Log In With Discourse';"
 } >> "${LSETTINGS}"
 
-# ── Fix ownership ─────────────────────────────────────────────────────────────
-chown -R apache:apache "${EXT_DIR}"
-
-# ── Composer dependencies for extensions that need it ─────────────────────────
-if ! command -v composer &>/dev/null; then
-  php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-  php composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
-  rm -f composer-setup.php
-fi
-
-# Composer 2.2+ blocks plugins unless explicitly allowed.
-# composer/installers is the standard MediaWiki extension install-path plugin.
-composer global config --no-plugins allow-plugins.composer/installers true
-
-for ext_dir in "${EXT_DIR}"/*/; do
-  if [ -f "${ext_dir}composer.json" ] && [ ! -d "${ext_dir}vendor" ]; then
-    echo "  Running composer install in $(basename "${ext_dir}") …"
-    composer install --no-dev --no-interaction --working-dir="${ext_dir}"
-  fi
-done
 
 echo "05-extensions.sh complete"

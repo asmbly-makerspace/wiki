@@ -74,10 +74,13 @@ build {
   sources = ["source.amazon-ebs.mediawiki"]
 
   # ── Upload config + scripts ───────────────────────────────────────────────
-  # File provisioners run first. 04-mediawiki.sh reads /tmp/LocalSettings.php.
+  # File provisioners run first.
+  #   - 04-mediawiki.sh reads /tmp/LocalSettings.php
+  #   - 05-extensions.sh reads /tmp/composer.local.json
   provisioner "file" {
     sources = [
       "${path.root}/../config/mediawiki/LocalSettings.php",
+      "${path.root}/../config/mediawiki/composer.local.json",
       "${path.root}/../config/httpd/mediawiki.conf",
       "${path.root}/../config/php/mediawiki.ini",
     ]
@@ -149,7 +152,7 @@ build {
     timeout = "15m"
   }
 
-  # ── Extensions (Gerrit REL1_43 + GitHub) ─────────────────────────────────
+  # ── Extensions (Composer + git fallback) ─────────────────────────────────
   provisioner "shell" {
     script           = "${path.root}/scripts/05-extensions.sh"
     execute_command  = "{{ .Vars }} sudo -E bash '{{ .Path }}'"

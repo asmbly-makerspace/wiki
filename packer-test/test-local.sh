@@ -144,9 +144,10 @@ run)
     "${IMAGE_NAME}" \
     bash -c "
       set -euo pipefail
-      cp /repo/config/mediawiki/LocalSettings.php /tmp/ 2>/dev/null || true
-      cp /repo/config/httpd/mediawiki.conf /tmp/        2>/dev/null || true
-      cp /repo/config/php/mediawiki.ini /tmp/           2>/dev/null || true
+      cp /repo/config/mediawiki/LocalSettings.php   /tmp/ 2>/dev/null || true
+      cp /repo/config/mediawiki/composer.local.json /tmp/ 2>/dev/null || true
+      cp /repo/config/httpd/mediawiki.conf /tmp/          2>/dev/null || true
+      cp /repo/config/php/mediawiki.ini /tmp/             2>/dev/null || true
       bash /repo/packer/scripts/${SCRIPT_NAME}
     "
   ;;
@@ -201,9 +202,10 @@ sync)
     'find /opt/mediawiki-ami -name "*.sh" -exec chmod +x {} +'
 
   # Config files to /tmp/ (mirrors Packer's file provisioner)
-  podman cp "${REPO_ROOT}/config/mediawiki/LocalSettings.php" "${CONTAINER_NAME}:/tmp/"
-  podman cp "${REPO_ROOT}/config/httpd/mediawiki.conf"        "${CONTAINER_NAME}:/tmp/" 2>/dev/null || true
-  podman cp "${REPO_ROOT}/config/php/mediawiki.ini"           "${CONTAINER_NAME}:/tmp/" 2>/dev/null || true
+  podman cp "${REPO_ROOT}/config/mediawiki/LocalSettings.php"   "${CONTAINER_NAME}:/tmp/"
+  podman cp "${REPO_ROOT}/config/mediawiki/composer.local.json" "${CONTAINER_NAME}:/tmp/"
+  podman cp "${REPO_ROOT}/config/httpd/mediawiki.conf"          "${CONTAINER_NAME}:/tmp/" 2>/dev/null || true
+  podman cp "${REPO_ROOT}/config/php/mediawiki.ini"             "${CONTAINER_NAME}:/tmp/" 2>/dev/null || true
 
   echo "==> Sync complete."
   echo "    /opt/packer-scripts/   — provisioner scripts (00-07)"
@@ -243,9 +245,10 @@ run-all)
 
   echo "==> Running all phases in a single container: ${PHASE_SCRIPTS[*]}"
   INLINE="set -euo pipefail
-cp /repo/config/mediawiki/LocalSettings.php /tmp/ 2>/dev/null || true
-cp /repo/config/httpd/mediawiki.conf /tmp/        2>/dev/null || true
-cp /repo/config/php/mediawiki.ini /tmp/           2>/dev/null || true
+cp /repo/config/mediawiki/LocalSettings.php   /tmp/ 2>/dev/null || true
+cp /repo/config/mediawiki/composer.local.json /tmp/ 2>/dev/null || true
+cp /repo/config/httpd/mediawiki.conf /tmp/          2>/dev/null || true
+cp /repo/config/php/mediawiki.ini /tmp/             2>/dev/null || true
 "
   for SCRIPT_NAME in "${PHASE_SCRIPTS[@]}"; do
     INLINE+="
