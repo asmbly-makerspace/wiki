@@ -8,17 +8,20 @@
 #
 #   Bundled in MW 1.43 (no clone needed):
 #     CategoryTree, Cite, CiteThisPage, CodeEditor, ConfirmEdit, Gadgets,
-#     ImageMap, InputBox, Interwiki, LocalisationUpdate, MultimediaViewer,
+#     ImageMap, InputBox, Interwiki, MultimediaViewer,
 #     Nuke, OATHAuth, PageImages, ParserFunctions, PdfHandler, Poem,
-#     Renameuser, ReplaceText, SecureLinkFixer, SpamBlacklist,
+#     ReplaceText, SecureLinkFixer, SpamBlacklist,
 #     SyntaxHighlight_GeSHi, TemplateData, TextExtracts, TitleBlacklist,
 #     VisualEditor, WikiEditor
+#     (also bundled: AbuseFilter, DiscussionTools, Echo, Linter, LoginNotify, Math, Thanks)
 #
-#   Separately installed (Gerrit REL1_43):
-#     Scribunto, TemplateStyles, JsonConfig
+#   Separately installed (Gerrit REL1_43 — verified via git ls-remote):
+#     Scribunto, TemplateStyles, JsonConfig, PluggableAuth, WikiCategoryTagCloud,
+#     Renameuser
+#     NOTE: LocalisationUpdate is ARCHIVED (T309694) — do not use.
 #
 #   Third-party (GitHub):
-#     PluggableAuth, DiscourseSsoConsumer, WikiCategoryTagCloud, IFrameTag
+#     DiscourseSsoConsumer, IFrameTag
 #
 # HOW TO FIND THE RIGHT VERSION:
 #   - https://www.mediawiki.org/wiki/Extension:<name>
@@ -27,7 +30,7 @@
 
 set -euxo pipefail
 
-MW_VERSION="${MW_VERSION:-1.43.0}"
+MW_VERSION="${MW_VERSION:-1.43.9}"
 MW_ROOT="/var/www/mediawiki"
 
 # ── Git safe.directory ────────────────────────────────────────────────────────
@@ -49,7 +52,6 @@ export GIT_TERMINAL_PROMPT=0
 git config --global credential.helper \
   "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN}; }; f"
 EXT_DIR="${MW_ROOT}/extensions"
-SKINS_DIR="${MW_ROOT}/skins"
 MW_BRANCH="REL${MW_VERSION%.*}"                   # e.g. REL1.43  → REL1_43
 MW_BRANCH="${MW_BRANCH//./_}"                      # REL1.43 → REL1_43
 
@@ -70,22 +72,16 @@ GERRIT_EXTENSIONS=(
   "WikiCategoryTagCloud|${MW_BRANCH}|extensions/WikiCategoryTagCloud"
   # Listed in MW 1.43 docs as bundled but absent from the tarball:
   "Renameuser|${MW_BRANCH}|extensions/Renameuser"
-  "LocalisationUpdate|${MW_BRANCH}|extensions/LocalisationUpdate"
+  # LocalisationUpdate is ARCHIVED (T309694) — no REL1_43 branch exists. Omitted.
 )
 
-# ── Third-party extensions from GitHub ────────────────────────────────────────
-# Array of "ExtensionFolderName|branch|github_url"
+# ── Third-party extensions from GitHub/others ────────────────────────────────────────
+# Array of "ExtensionFolderName|branch|git_url"
 GITHUB_EXTENSIONS=(
   # Discourse SSO consumer — authenticates wiki users against Discourse
-  "DiscourseSsoConsumer|main|https://github.com/centertap/DiscourseSsoConsumer.git"
+  "DiscourseSsoConsumer|releases/tag/5.0.2|https://codeberg.org/centertap/DiscourseSsoConsumer.git"
   # Allows embedding iframes (used for restreamer.asmbly.org)
-  "IFrameTag|master|https://github.com/hexmode/mediawiki-iframe.git"
-)
-
-# Skins to install alongside Vector (which is bundled)
-SKINS=(
-  "Timeless|${MW_BRANCH}|skins/Timeless"
-  "MonoBook|${MW_BRANCH}|skins/MonoBook"
+  "IFrameTag|releases/tag/1.1.3|https://github.com/hexmode/mediawiki-iframe.git"
 )
 
 GERRIT_BASE_URL="https://gerrit.wikimedia.org/r/mediawiki"
@@ -123,21 +119,11 @@ for entry in "${GITHUB_EXTENSIONS[@]}"; do
   clone_or_update "${dest}" "${url}" "${branch}"
 done
 
-# ── Clone skins ───────────────────────────────────────────────────────────────
-echo "Installing extra skins"
-for entry in "${SKINS[@]}"; do
-  IFS='|' read -r name branch repo_path <<< "${entry}"
-  dest="${SKINS_DIR}/${name}"
-  url="${GERRIT_BASE_URL}/${repo_path}"
-  clone_or_update "${dest}" "${url}" "${branch}"
-done
-
-# ── Append wfLoadExtension() calls to LocalSettings.php ──────────────────────
 LSETTINGS="${MW_ROOT}/LocalSettings.php"
 {
   echo ""
   echo "# === Bundled extensions (shipped with MW 1.43 tarball) ==="
-  echo "# Note: Renameuser and LocalisationUpdate are NOT in the 1.43 tarball"
+  echo "# Note: Renameuser is NOT in the 1.43 tarball"
   echo "# despite documentation — they are cloned via GERRIT_EXTENSIONS above."
   echo "wfLoadExtension( 'CategoryTree' );"
   echo "wfLoadExtension( 'Cite' );"
@@ -209,16 +195,13 @@ LSETTINGS="${MW_ROOT}/LocalSettings.php"
     fi
   done
   echo ""
-  echo "# === Extra skins ==="
-  for entry in "${SKINS[@]}"; do
-    IFS='|' read -r name branch repo_path <<< "${entry}"
-    skin_dir="${SKINS_DIR}/${name}"
-    if [ -f "${skin_dir}/skin.json" ]; then
-      echo "wfLoadSkin( '${name}' );"
-    fi
-  done
+  echo "# === Skins (all four ship with the MW 1.43 tarball) ==="
+  echo "# Vector is the default and loaded automatically."
+  echo "wfLoadSkin( 'MonoBook' );"
+  echo "wfLoadSkin( 'Timeless' );"
+  echo "wfLoadSkin( 'MinervaNeue' );"
   echo ""
-  echo "# === Extension configuration ==="
+  echo "# === Separately installed extensions ==="
   echo ""
   echo "# Scribunto (Lua)"
   echo "\$wgScribuntoDefaultEngine = 'luastandalone';"
@@ -278,7 +261,7 @@ LSETTINGS="${MW_ROOT}/LocalSettings.php"
 } >> "${LSETTINGS}"
 
 # ── Fix ownership ─────────────────────────────────────────────────────────────
-chown -R apache:apache "${EXT_DIR}" "${SKINS_DIR}"
+chown -R apache:apache "${EXT_DIR}"
 
 # ── Composer dependencies for extensions that need it ─────────────────────────
 if ! command -v composer &>/dev/null; then

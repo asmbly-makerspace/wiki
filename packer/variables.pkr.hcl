@@ -26,7 +26,7 @@ variable "ami_name_prefix" {
 
 variable "mediawiki_version" {
   type        = string
-  default     = "1.43.0"
+  default     = "1.43.9"
   description = "MediaWiki release tarball version to install."
 }
 

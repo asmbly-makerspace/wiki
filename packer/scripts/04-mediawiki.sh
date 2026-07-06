@@ -5,7 +5,7 @@
 # (uploaded to /tmp/ by Packer's file provisioner) using envsubst.
 set -euxo pipefail
 
-MW_VERSION="${MW_VERSION:-1.43.0}"
+MW_VERSION="${MW_VERSION:-1.43.9}"
 MW_DB_NAME="${MW_DB_NAME:-mediawiki}"
 MW_DB_USER="${MW_DB_USER:-wiki}"
 
@@ -23,18 +23,29 @@ MW_DOWNLOAD_URL="https://releases.wikimedia.org/mediawiki/${MW_VERSION%.*}/${MW_
 # ── Download ──────────────────────────────────────────────────────────────────
 cd /tmp
 echo "Downloading MediaWiki ${MW_VERSION}…"
-curl -fsSL -o "${MW_TARBALL}" "${MW_DOWNLOAD_URL}"
+curl -fsSL -o "${MW_TARBALL}"     "${MW_DOWNLOAD_URL}"
+curl -fsSL -o "${MW_TARBALL}.sig" "${MW_DOWNLOAD_URL}.sig"
 
-# Verify download checksum (Wikimedia publishes SHA256 alongside the tarball)
-curl -fsSL -o "${MW_TARBALL}.sha256" "${MW_DOWNLOAD_URL}.sha256" || \
-  curl -fsSL -o "${MW_TARBALL}.sha256" \
-    "https://releases.wikimedia.org/mediawiki/${MW_VERSION%.*}/${MW_TARBALL}.sha256" || true
+# ── GPG signature verification ────────────────────────────────────────────────
+# Wikimedia signs every release tarball with a GPG detached signature (.sig).
+# The build fails hard if the signature does not verify.
+command -v gpg >/dev/null || dnf install -y gnupg2
 
-if [ -f "${MW_TARBALL}.sha256" ]; then
-  sha256sum -c "${MW_TARBALL}.sha256" && echo "Checksum OK"
-else
-  echo "WARNING: Could not fetch SHA256 — skipping checksum verification"
-fi
+# Initialise the GPG home directory — required on a fresh system before any
+# gpg operation, otherwise gpg may fail silently or with confusing errors.
+mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
+
+# Import Wikimedia release signing keys.  Write to a file rather than piping
+# to avoid stdin/pipe issues on a freshly provisioned instance.
+# gpg --import exits non-zero on warnings (missing cross-signatures, unavailable
+# algorithm preferences) even when the keys themselves are imported successfully.
+# The verify step below is the real security gate — tolerate import warnings here.
+curl -fsSL -o /tmp/mediawiki-keys.txt https://www.mediawiki.org/keys/keys.txt
+gpg --import --batch /tmp/mediawiki-keys.txt 2>&1 || true
+rm -f /tmp/mediawiki-keys.txt
+
+gpg --verify "${MW_TARBALL}.sig" "${MW_TARBALL}"
+echo "GPG signature OK — ${MW_TARBALL} is authentic"
 
 # ── Extract ───────────────────────────────────────────────────────────────────
 mkdir -p /var/www

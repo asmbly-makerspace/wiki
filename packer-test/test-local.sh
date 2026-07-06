@@ -63,7 +63,7 @@ build_env_flags() {
       ENV_FLAGS+=("-e" "${var}=${!var}")
     fi
   done
-  [[ -v MW_VERSION ]]  || ENV_FLAGS+=("-e" "MW_VERSION=1.43.0")
+  [[ -v MW_VERSION ]]  || ENV_FLAGS+=("-e" "MW_VERSION=1.43.9")
   [[ -v MW_DB_NAME ]]  || ENV_FLAGS+=("-e" "MW_DB_NAME=mediawiki")
   [[ -v MW_DB_USER ]]  || ENV_FLAGS+=("-e" "MW_DB_USER=wiki")
   [[ -v PHP_VERSION ]] || ENV_FLAGS+=("-e" "PHP_VERSION=8.3")

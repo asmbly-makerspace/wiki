@@ -3,13 +3,13 @@ name: Build MediaWiki AMI
 on:
   push:
     tags:
-      - 'ami/v*'       # e.g. ami/v1.43.0
+      - 'ami/v*'       # e.g. ami/v1.43.9
   workflow_dispatch:   # manual trigger from the Actions UI
     inputs:
       mediawiki_version:
-        description: 'MediaWiki version to build (e.g. 1.43.0)'
+        description: 'MediaWiki version to build (e.g. 1.43.9)'
         required: false
-        default: '1.43.0'
+        default: '1.43.9'
       dry_run:
         description: 'Validate only — do not build the AMI'
         required: false
@@ -60,7 +60,7 @@ jobs:
           PKR_VAR_github_token:        ${{ secrets.GITHUB_TOKEN }}
         run: |
           packer validate \
-            -var "mediawiki_version=${{ inputs.mediawiki_version || '1.43.0' }}" \
+            -var "mediawiki_version=${{ inputs.mediawiki_version || '1.43.9' }}" \
             .
 
   build:
@@ -97,10 +97,10 @@ jobs:
         id: version
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
-            # Extract from tag: ami/v1.43.0 → 1.43.0
+            # Extract from tag: ami/v1.43.9 → 1.43.9
             VERSION="${GITHUB_REF_NAME#ami/v}"
           else
-            VERSION="${{ inputs.mediawiki_version || '1.43.0' }}"
+            VERSION="${{ inputs.mediawiki_version || '1.43.9' }}"
           fi
           echo "mw_version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Building MediaWiki ${VERSION}"
