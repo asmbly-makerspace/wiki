@@ -56,7 +56,7 @@ jobs:
           PKR_VAR_mw_upgrade_key:      ${{ secrets.MW_UPGRADE_KEY }}
           PKR_VAR_mw_smtp_password:    ${{ secrets.MW_SMTP_PASSWORD }}
           PKR_VAR_mw_discourse_secret: ${{ secrets.MW_DISCOURSE_SECRET }}
-          PKR_VAR_backup_bucket:       ${{ secrets.BACKUP_BUCKET }}
+          PKR_VAR_backup_bucket:       ${{ vars.BACKUP_BUCKET }}
           PKR_VAR_github_token:        ${{ secrets.GITHUB_TOKEN }}
         run: |
           packer validate \
@@ -117,7 +117,7 @@ jobs:
           PKR_VAR_mw_upgrade_key:      ${{ secrets.MW_UPGRADE_KEY }}
           PKR_VAR_mw_smtp_password:    ${{ secrets.MW_SMTP_PASSWORD }}
           PKR_VAR_mw_discourse_secret: ${{ secrets.MW_DISCOURSE_SECRET }}
-          PKR_VAR_backup_bucket:       ${{ secrets.BACKUP_BUCKET }}
+          PKR_VAR_backup_bucket:       ${{ vars.BACKUP_BUCKET }}
           PKR_VAR_github_token:        ${{ secrets.GITHUB_TOKEN }}
           PACKER_LOG:                  "1"
           PACKER_LOG_PATH:             "/tmp/packer.log"
@@ -182,10 +182,10 @@ jobs:
             echo ""
             echo "### Next steps"
             echo "1. Launch a t4g.medium EC2 instance from this AMI in us-east-2"
-            echo "2. Attach an IAM instance profile with S3 read/write access to \`${{ secrets.BACKUP_BUCKET }}\`"
+            echo "2. Attach an IAM instance profile with S3 read/write access to \`${{ vars.BACKUP_BUCKET }}\`"
             echo "3. SSH in and restore data:"
             echo "   \`\`\`"
-            echo "   sudo BACKUP_BUCKET=${{ secrets.BACKUP_BUCKET }} bash /opt/mediawiki-ami/restore/restore.sh"
+            echo "   sudo BACKUP_BUCKET=${{ vars.BACKUP_BUCKET }} bash /opt/mediawiki-ami/restore/restore.sh"
             echo "   sudo bash /opt/mediawiki-ami/restore/upgrade-1.35-to-1.43.sh"
             echo "   \`\`\`"
             echo "4. Validate, then move the Elastic IP to cut over"
