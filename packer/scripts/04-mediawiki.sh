@@ -29,7 +29,7 @@ curl -fsSL -o "${MW_TARBALL}.sig" "${MW_DOWNLOAD_URL}.sig"
 # ── GPG signature verification ────────────────────────────────────────────────
 # Wikimedia signs every release tarball with a GPG detached signature (.sig).
 # The build fails hard if the signature does not verify.
-command -v gpg >/dev/null || dnf install -y gnupg2
+# gnupg2 is installed in phase 00.
 
 # Initialise the GPG home directory — required on a fresh system before any
 # gpg operation, otherwise gpg may fail silently or with confusing errors.

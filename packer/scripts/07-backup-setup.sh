@@ -32,4 +32,7 @@ cp /tmp/config/logrotate/mediawiki-backup /etc/logrotate.d/mediawiki-backup
 touch /var/log/mediawiki-backup.log
 chmod 640 /var/log/mediawiki-backup.log
 
+# ── Remove staged config (last phase — no longer needed) ─────────────────────
+rm -rf /tmp/config
+
 echo "07-backup-setup.sh complete — backup cron configured"

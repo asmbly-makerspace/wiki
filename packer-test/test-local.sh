@@ -144,10 +144,7 @@ run)
     "${IMAGE_NAME}" \
     bash -c "
       set -euo pipefail
-      cp /repo/config/mediawiki/LocalSettings.php   /tmp/ 2>/dev/null || true
-      cp /repo/config/mediawiki/composer.local.json /tmp/ 2>/dev/null || true
-      cp /repo/config/httpd/mediawiki.conf /tmp/          2>/dev/null || true
-      cp /repo/config/php/mediawiki.ini /tmp/             2>/dev/null || true
+      cp -r /repo/config /tmp/config
       bash /repo/packer/scripts/${SCRIPT_NAME}
     "
   ;;
@@ -201,16 +198,14 @@ sync)
   podman exec "${CONTAINER_NAME}" bash -c \
     'find /opt/mediawiki-ami -name "*.sh" -exec chmod +x {} +'
 
-  # Config files to /tmp/ (mirrors Packer's file provisioner)
-  podman cp "${REPO_ROOT}/config/mediawiki/LocalSettings.php"   "${CONTAINER_NAME}:/tmp/"
-  podman cp "${REPO_ROOT}/config/mediawiki/composer.local.json" "${CONTAINER_NAME}:/tmp/"
-  podman cp "${REPO_ROOT}/config/httpd/mediawiki.conf"          "${CONTAINER_NAME}:/tmp/" 2>/dev/null || true
-  podman cp "${REPO_ROOT}/config/php/mediawiki.ini"             "${CONTAINER_NAME}:/tmp/" 2>/dev/null || true
+  # Config directory to /tmp/config (mirrors Packer's file provisioner)
+  podman exec "${CONTAINER_NAME}" mkdir -p /tmp/config
+  podman cp "${REPO_ROOT}/config/." "${CONTAINER_NAME}:/tmp/config/"
 
   echo "==> Sync complete."
   echo "    /opt/packer-scripts/   — provisioner scripts (00-07)"
   echo "    /opt/mediawiki-ami/    — backup / restore / inventory scripts"
-  echo "    /tmp/                  — LocalSettings.php + httpd/php configs"
+  echo "    /tmp/config/           — all canonical config files"
   ;;
 
 # ── Run a phase inside the live persistent container ─────────────────────────
@@ -229,7 +224,7 @@ shell)
   echo "==> Opening shell in '${CONTAINER_NAME}'…"
   echo "    Packer scripts:  /opt/packer-scripts/"
   echo "    Runtime scripts: /opt/mediawiki-ami/"
-  echo "    Config files:    /tmp/"
+  echo "    Config files:    /tmp/config/"
   podman exec -it "${CONTAINER_NAME}" bash
   ;;
 
@@ -245,10 +240,7 @@ run-all)
 
   echo "==> Running all phases in a single container: ${PHASE_SCRIPTS[*]}"
   INLINE="set -euo pipefail
-cp /repo/config/mediawiki/LocalSettings.php   /tmp/ 2>/dev/null || true
-cp /repo/config/mediawiki/composer.local.json /tmp/ 2>/dev/null || true
-cp /repo/config/httpd/mediawiki.conf /tmp/          2>/dev/null || true
-cp /repo/config/php/mediawiki.ini /tmp/             2>/dev/null || true
+cp -r /repo/config /tmp/config
 "
   for SCRIPT_NAME in "${PHASE_SCRIPTS[@]}"; do
     INLINE+="

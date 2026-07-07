@@ -6,9 +6,6 @@ set -euxo pipefail
 # ── Install Apache ────────────────────────────────────────────────────────────
 dnf install -y httpd mod_ssl
 
-# ── mod_php — link the installed PHP Apache module ────────────────────────────
-# AL2023 ships php-fpm; we use FPM via proxy_fcgi. mod_php is not used.
-dnf install -y php-fpm || true    # in case we're using FPM
 
 # ── Apache global configuration tweaks ────────────────────────────────────────
 cp /tmp/config/httpd/security.conf /etc/httpd/conf.d/security.conf
