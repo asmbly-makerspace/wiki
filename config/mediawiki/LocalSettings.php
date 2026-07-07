@@ -211,7 +211,7 @@ wfLoadExtension( 'PageImages' );
 wfLoadExtension( 'ParserFunctions' );
 wfLoadExtension( 'PdfHandler' );
 wfLoadExtension( 'Poem' );
-wfLoadExtension( 'Renameuser' );
+wfLoadExtension( 'RenameUser' );
 wfLoadExtension( 'ReplaceText' );
 wfLoadExtension( 'SecureLinkFixer' );
 wfLoadExtension( 'SpamBlacklist' );
