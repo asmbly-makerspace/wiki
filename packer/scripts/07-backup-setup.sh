@@ -11,8 +11,10 @@
 # by editing /etc/sysconfig/mediawiki-backup.
 set -euxo pipefail
 
-BACKUP_BUCKET="${BACKUP_BUCKET:-}"
-AWS_REGION="${AWS_REGION:-us-east-2}"
+: "${AWS_REGION:?AWS_REGION must be set}"
+# BACKUP_BUCKET is intentionally optional at build time — may be empty.
+# Operator sets /etc/sysconfig/mediawiki-backup post-launch after bucket creation.
+# Only used inside single-quoted envsubst args; bash set -u does not apply.
 
 # ── Write environment config file ─────────────────────────────────────────────
 # Operators can edit this post-launch to set/change the bucket

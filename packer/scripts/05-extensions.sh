@@ -43,7 +43,8 @@
 
 set -euxo pipefail
 
-MW_VERSION="${MW_VERSION:-1.43.9}"
+: "${MW_VERSION:?MW_VERSION must be set}"
+: "${GITHUB_TOKEN:?GITHUB_TOKEN must be set}"
 MW_ROOT="/var/www/mediawiki"
 EXT_DIR="${MW_ROOT}/extensions"
 MW_BRANCH="REL${MW_VERSION%.*}"                   # e.g. REL1.43  → REL1_43
@@ -59,7 +60,6 @@ git config --global --add safe.directory '*'
 # A fine-grained PAT or classic token with read:packages / contents:read scope.
 # Injected by Packer as GITHUB_TOKEN; used for rate limiting on public repos
 # and required for any private repositories.
-: "${GITHUB_TOKEN:?GITHUB_TOKEN must be set}"
 
 # Never fall back to an interactive prompt — fail fast if credentials are wrong.
 export GIT_TERMINAL_PROMPT=0

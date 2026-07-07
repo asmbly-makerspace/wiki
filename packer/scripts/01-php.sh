@@ -8,7 +8,7 @@
 # 8.5) and must NOT be used — it will silently install the wrong version.
 set -euxo pipefail
 
-PHP_VERSION="${PHP_VERSION:-8.3}"
+: "${PHP_VERSION:?PHP_VERSION must be set}"
 PHP_MAJOR="${PHP_VERSION%%.*}"               # "8"
 PHP_MINOR="${PHP_VERSION##*.}"               # "3"
 PHP_PKG_SUFFIX="${PHP_MAJOR}.${PHP_MINOR}"   # "8.3"

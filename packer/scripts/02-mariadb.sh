@@ -3,9 +3,9 @@
 # Phase 2: Install MariaDB 10.11 LTS, create MediaWiki DB and user.
 set -euxo pipefail
 
-MW_DB_NAME="${MW_DB_NAME:-mediawiki}"
-MW_DB_USER="${MW_DB_USER:-wiki}"
-MW_DB_PASSWORD="${MW_DB_PASSWORD:?MW_DB_PASSWORD must be set}"
+: "${MW_DB_NAME:?MW_DB_NAME must be set}"
+: "${MW_DB_USER:?MW_DB_USER must be set}"
+: "${MW_DB_PASSWORD:?MW_DB_PASSWORD must be set}"
 
 # ── Install MariaDB 10.11 from the official MariaDB repo ──────────────────────
 cp /tmp/config/mariadb/mariadb.repo /etc/yum.repos.d/mariadb.repo

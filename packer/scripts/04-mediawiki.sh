@@ -5,20 +5,18 @@
 # (uploaded to /tmp/config/ by Packer's file provisioner) using envsubst.
 set -euxo pipefail
 
-MW_VERSION="${MW_VERSION:-1.43.9}"
-MW_DB_NAME="${MW_DB_NAME:-mediawiki}"
-MW_DB_USER="${MW_DB_USER:-wiki}"
-
-MW_ROOT="/var/www/mediawiki"
-MW_TARBALL="mediawiki-${MW_VERSION}.tar.gz"
-MW_DOWNLOAD_URL="https://releases.wikimedia.org/mediawiki/${MW_VERSION%.*}/${MW_TARBALL}"
-
-# All five secrets are required for envsubst substitution into LocalSettings.php
+: "${MW_VERSION:?MW_VERSION must be set}"
+: "${MW_DB_NAME:?MW_DB_NAME must be set}"
+: "${MW_DB_USER:?MW_DB_USER must be set}"
 : "${MW_DB_PASSWORD:?MW_DB_PASSWORD must be set}"
 : "${MW_SECRET_KEY:?MW_SECRET_KEY must be set}"
 : "${MW_UPGRADE_KEY:?MW_UPGRADE_KEY must be set}"
 : "${MW_SMTP_PASSWORD:?MW_SMTP_PASSWORD must be set}"
 : "${MW_DISCOURSE_SECRET:?MW_DISCOURSE_SECRET must be set}"
+
+MW_ROOT="/var/www/mediawiki"
+MW_TARBALL="mediawiki-${MW_VERSION}.tar.gz"
+MW_DOWNLOAD_URL="https://releases.wikimedia.org/mediawiki/${MW_VERSION%.*}/${MW_TARBALL}"
 
 # ── Download ──────────────────────────────────────────────────────────────────
 cd /tmp
