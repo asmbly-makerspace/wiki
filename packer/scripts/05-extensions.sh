@@ -127,6 +127,13 @@ chown -R root:root "${MW_ROOT}"
 # Tell Composer the exact version of the root package (mediawiki/core).
 export COMPOSER_ROOT_VERSION="${MW_VERSION}"
 
+# Packer provisioner scripts run as root. Composer 2.x disables all plugins in
+# non-interactive root sessions unless this is set. Plugins are required:
+#   - composer/installers      routes packages to extensions/ by type
+#   - wikimedia/composer-merge-plugin  merges composer.local.json
+# This is safe here — we are intentionally running as root in a build image.
+export COMPOSER_ALLOW_SUPERUSER=1
+
 composer update --no-dev --no-interaction --prefer-dist --optimize-autoloader
 echo "Composer update completed successfully"
 
