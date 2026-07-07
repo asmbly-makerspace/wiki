@@ -58,7 +58,7 @@ build_env_flags() {
   for var in \
       MW_VERSION MW_DB_NAME MW_DB_USER MW_DB_PASSWORD \
       MW_SECRET_KEY MW_UPGRADE_KEY MW_SMTP_PASSWORD MW_DISCOURSE_SECRET \
-      PHP_VERSION GITHUB_TOKEN; do
+      PHP_VERSION GITHUB_TOKEN AWS_REGION BACKUP_BUCKET; do
     if [[ -n "${!var:-}" ]]; then
       ENV_FLAGS+=("-e" "${var}=${!var}")
     fi

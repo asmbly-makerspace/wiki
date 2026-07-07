@@ -60,7 +60,7 @@ jobs:
           PKR_VAR_github_token:        ${{ secrets.GITHUB_TOKEN }}
         run: |
           packer validate \
-            -var "mediawiki_version=${{ inputs.mediawiki_version || '1.43.9' }}" \
+            -var "mediawiki_version=${{ inputs.mediawiki_version }}" \
             .
 
   build:
@@ -100,7 +100,7 @@ jobs:
             # Extract from tag: ami/v1.43.9 → 1.43.9
             VERSION="${GITHUB_REF_NAME#ami/v}"
           else
-            VERSION="${{ inputs.mediawiki_version || '1.43.9' }}"
+            VERSION="${{ inputs.mediawiki_version }}"
           fi
           echo "mw_version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Building MediaWiki ${VERSION}"
