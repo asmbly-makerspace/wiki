@@ -93,13 +93,13 @@ composer config --global github-oauth.github.com "${GITHUB_TOKEN}"
 
 # ── Deploy composer.local.json ────────────────────────────────────────────────
 # The template is committed to the repo at config/mediawiki/composer.local.json
-# and copied to /tmp/ by Packer's file provisioner (same as LocalSettings.php).
-COMPOSER_LOCAL_SRC="/tmp/composer.local.json"
+# uploaded to /tmp/config/ by Packer's file provisioner.
+COMPOSER_LOCAL_SRC="/tmp/config/mediawiki/composer.local.json"
 COMPOSER_LOCAL_DEST="${MW_ROOT}/composer.local.json"
 
 if [ ! -f "${COMPOSER_LOCAL_SRC}" ]; then
   echo "ERROR: composer.local.json not found at ${COMPOSER_LOCAL_SRC}"
-  echo "Ensure Packer's file provisioner copies config/mediawiki/composer.local.json to /tmp/"
+  echo "Ensure Packer's file provisioner uploads config/ to /tmp/config/"
   exit 1
 fi
 
@@ -123,6 +123,9 @@ cd "${MW_ROOT}"
 
 # Temporarily grant write access for Composer to install into extensions/
 chown -R root:root "${MW_ROOT}"
+
+# Tell Composer the exact version of the root package (mediawiki/core).
+export COMPOSER_ROOT_VERSION="${MW_VERSION}"
 
 composer update --no-dev --no-interaction --prefer-dist --optimize-autoloader
 echo "Composer update completed successfully"

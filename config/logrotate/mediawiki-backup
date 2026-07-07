@@ -1,0 +1,11 @@
+# mediawiki-backup — logrotate config for the backup log
+# Uploaded to /tmp/ by Packer; installed by 07-backup-setup.sh.
+/var/log/mediawiki-backup.log {
+    weekly
+    missingok
+    rotate 4
+    compress
+    delaycompress
+    notifempty
+}
+

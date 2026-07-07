@@ -2,7 +2,7 @@
 # packer/scripts/04-mediawiki.sh
 # Phase 4: Download and install MediaWiki 1.43 core.
 # LocalSettings.php is generated from config/mediawiki/LocalSettings.php
-# (uploaded to /tmp/ by Packer's file provisioner) using envsubst.
+# (uploaded to /tmp/config/ by Packer's file provisioner) using envsubst.
 set -euxo pipefail
 
 MW_VERSION="${MW_VERSION:-1.43.9}"
@@ -70,8 +70,7 @@ chmod 750 "${MW_ROOT}/maintenance"
 # ── LocalSettings.php ─────────────────────────────────────────────────────────
 # The template is committed to the repo at config/mediawiki/LocalSettings.php.
 # Secrets are injected here via envsubst; the template uses ${VAR_NAME} placeholders.
-# The template was copied to /tmp/ by Packer's file provisioner.
-LSETTINGS_TMPL="/tmp/LocalSettings.php"
+LSETTINGS_TMPL="/tmp/config/mediawiki/LocalSettings.php"
 [ -f "${LSETTINGS_TMPL}" ] || { echo "ERROR: LocalSettings.php template not found at ${LSETTINGS_TMPL}"; exit 1; }
 
 envsubst '${MW_DB_PASSWORD} ${MW_SECRET_KEY} ${MW_UPGRADE_KEY} ${MW_SMTP_PASSWORD} ${MW_DISCOURSE_SECRET}' \

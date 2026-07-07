@@ -1,0 +1,11 @@
+# mediawiki-backup — sysconfig environment file for the backup scripts
+# Uploaded to /tmp/ by Packer; processed with envsubst by 07-backup-setup.sh.
+# Operators can edit /etc/sysconfig/mediawiki-backup post-launch to change settings.
+#
+# IMPORTANT: Before the first backup runs, apply the S3 Lifecycle Rules to your
+# bucket so that AWS automatically expires old backups.
+# See: docs/s3-backup-setup.md  (run once per bucket from your workstation)
+BACKUP_BUCKET=${BACKUP_BUCKET}
+AWS_REGION=${AWS_REGION}
+MW_ROOT=/var/www/mediawiki
+

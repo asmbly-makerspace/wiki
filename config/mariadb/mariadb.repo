@@ -1,0 +1,12 @@
+# mariadb.repo — MariaDB 10.11 LTS yum repository for Amazon Linux 2023
+# AL2023 is RHEL 9-compatible but $releasever resolves to "2023", so the
+# RHEL 9 repo path is hardcoded.
+# Uploaded to /tmp/ by Packer; installed by 02-mariadb.sh.
+[mariadb]
+name = MariaDB 10.11 LTS
+baseurl = https://rpm.mariadb.org/10.11/rhel/9/$basearch
+gpgkey = https://rpm.mariadb.org/RPM-GPG-KEY-MariaDB
+gpgcheck = 1
+enabled = 1
+module_hotfixes = 1
+

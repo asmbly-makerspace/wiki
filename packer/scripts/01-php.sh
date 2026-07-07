@@ -48,27 +48,7 @@ PHP_INI_DIR=$(php --ini 2>/dev/null | grep "Scan for additional" | awk '{print $
 PHP_INI_DIR="${PHP_INI_DIR:-/etc/php.d}"
 mkdir -p "${PHP_INI_DIR}"
 
-cat > "${PHP_INI_DIR}/mediawiki.ini" << 'EOF'
-; MediaWiki recommended PHP settings
-memory_limit            = 256M
-upload_max_filesize     = 100M
-post_max_size           = 100M
-max_execution_time      = 60
-max_input_time          = 60
-date.timezone           = UTC
-expose_php              = Off
-
-; OPcache — greatly improves performance
-opcache.enable                = 1
-opcache.memory_consumption    = 128
-opcache.interned_strings_buffer = 8
-opcache.max_accelerated_files = 4000
-opcache.revalidate_freq       = 60
-opcache.fast_shutdown         = 1
-
-; APCu object cache for MediaWiki
-apc.shm_size = 64M
-EOF
+cp /tmp/config/php/mediawiki.ini "${PHP_INI_DIR}/mediawiki.ini"
 
 # ── Verify ────────────────────────────────────────────────────────────────────
 php --version

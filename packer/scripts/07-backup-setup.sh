@@ -16,45 +16,20 @@ AWS_REGION="${AWS_REGION:-us-east-2}"
 
 # ── Write environment config file ─────────────────────────────────────────────
 # Operators can edit this post-launch to set/change the bucket
-cat > /etc/sysconfig/mediawiki-backup << EOF
-# MediaWiki Backup Configuration
-# Edit this file after launch to set your S3 bucket name.
-#
-# IMPORTANT: Before the first backup runs, apply the S3 Lifecycle Rules to your
-# bucket so that AWS automatically expires old backups.
-# See: docs/s3-backup-setup.md  (run once per bucket from your workstation)
-BACKUP_BUCKET="${BACKUP_BUCKET}"
-AWS_REGION="${AWS_REGION}"
-MW_ROOT="/var/www/mediawiki"
-EOF
+envsubst '${BACKUP_BUCKET} ${AWS_REGION}' \
+  < /tmp/config/system/mediawiki-backup.sysconfig \
+  > /etc/sysconfig/mediawiki-backup
 chmod 600 /etc/sysconfig/mediawiki-backup
 
 # ── Install backup cron job ───────────────────────────────────────────────────
-cat > /etc/cron.d/mediawiki-backup << 'EOF'
-# MediaWiki automated backup with GFS retention
-# Runs nightly at 02:00 CDT = 08:00 UTC
-# Edit /etc/sysconfig/mediawiki-backup to configure bucket and retention
-SHELL=/bin/bash
-
-0 8 * * * root /opt/mediawiki-ami/backup/backup-with-retention.sh >> /var/log/mediawiki-backup.log 2>&1
-EOF
+cp /tmp/config/cron/mediawiki-backup /etc/cron.d/mediawiki-backup
 chmod 644 /etc/cron.d/mediawiki-backup
 
 # ── Log rotation for backup logs ──────────────────────────────────────────────
-cat > /etc/logrotate.d/mediawiki-backup << 'EOF'
-/var/log/mediawiki-backup.log {
-    weekly
-    missingok
-    rotate 4
-    compress
-    delaycompress
-    notifempty
-}
-EOF
+cp /tmp/config/logrotate/mediawiki-backup /etc/logrotate.d/mediawiki-backup
 
 # ── Create the log file ───────────────────────────────────────────────────────
 touch /var/log/mediawiki-backup.log
 chmod 640 /var/log/mediawiki-backup.log
 
 echo "07-backup-setup.sh complete — backup cron configured"
-

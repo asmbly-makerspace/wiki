@@ -1,0 +1,40 @@
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/httpd/mediawiki-error.log",
+            "log_group_name": "/mediawiki/apache/error",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/httpd/mediawiki-access.log",
+            "log_group_name": "/mediawiki/apache/access",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/mariadb/slow.log",
+            "log_group_name": "/mediawiki/mariadb/slow",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/mediawiki-backup.log",
+            "log_group_name": "/mediawiki/backup",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    },
+    "metrics_collected": {
+      "cpu":  { "measurement": ["usage_active"],      "metrics_collection_interval": 60 },
+      "disk": { "measurement": ["used_percent"],       "metrics_collection_interval": 60 },
+      "mem":  { "measurement": ["mem_used_percent"],   "metrics_collection_interval": 60 }
+    }
+  }
+}
+
