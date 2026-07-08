@@ -7,7 +7,7 @@ aws_region        = "us-east-2"
 vpc_id            = "vpc-0123456789abcdef0"
 subnet_id         = "subnet-0123456789abcdef0"
 ami_name_prefix   = "mediawiki"
-mediawiki_version = "1.43.0"
+mediawiki_version = "1.43.9"
 php_version       = "8.3"
 instance_type     = "t4g.medium"
 mw_db_name        = "mediawiki"
@@ -20,6 +20,7 @@ backup_bucket     = "my-mediawiki-backups"
 # mw_upgrade_key      = "..."   # openssl rand -hex 16
 # mw_smtp_password    = "..."   # Gmail app password — ROTATE from old value
 # mw_discourse_secret = "..."   # Discourse SSO secret — ROTATE from old value
+# github_token        = "..."   # GitHub PAT, read:contents scope
 
 extra_tags = {
   Environment = "production"

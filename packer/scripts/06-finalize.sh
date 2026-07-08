@@ -34,11 +34,7 @@ chmod 640 "${MW_ROOT}/LocalSettings.php"
 chown root:apache "${MW_ROOT}/LocalSettings.php"
 
 # ── Install a cron job for MediaWiki job queue processing ─────────────────────
-cat > /etc/cron.d/mediawiki-jobs << 'EOF'
-# MediaWiki job queue runner — runs every minute
-* * * * * apache php /var/www/mediawiki/maintenance/runJobs.php \
-    --maxtime=55 --quiet 2>/dev/null
-EOF
+cp /tmp/config/cron/mediawiki-jobs /etc/cron.d/mediawiki-jobs
 chmod 644 /etc/cron.d/mediawiki-jobs
 
 # ── CloudWatch Agent stub config ──────────────────────────────────────────────
@@ -46,47 +42,7 @@ chmod 644 /etc/cron.d/mediawiki-jobs
 dnf install -y amazon-cloudwatch-agent || true
 
 mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/
-cat > /opt/aws/amazon-cloudwatch-agent/etc/mediawiki-cwa.json << 'EOF'
-{
-  "logs": {
-    "logs_collected": {
-      "files": {
-        "collect_list": [
-          {
-            "file_path": "/var/log/httpd/mediawiki-error.log",
-            "log_group_name": "/mediawiki/apache/error",
-            "log_stream_name": "{instance_id}",
-            "timezone": "UTC"
-          },
-          {
-            "file_path": "/var/log/httpd/mediawiki-access.log",
-            "log_group_name": "/mediawiki/apache/access",
-            "log_stream_name": "{instance_id}",
-            "timezone": "UTC"
-          },
-          {
-            "file_path": "/var/log/mariadb/slow.log",
-            "log_group_name": "/mediawiki/mariadb/slow",
-            "log_stream_name": "{instance_id}",
-            "timezone": "UTC"
-          },
-          {
-            "file_path": "/var/log/mediawiki-backup.log",
-            "log_group_name": "/mediawiki/backup",
-            "log_stream_name": "{instance_id}",
-            "timezone": "UTC"
-          }
-        ]
-      }
-    },
-    "metrics_collected": {
-      "cpu":    { "measurement": ["usage_active"], "metrics_collection_interval": 60 },
-      "disk":   { "measurement": ["used_percent"],  "metrics_collection_interval": 60 },
-      "mem":    { "measurement": ["mem_used_percent"], "metrics_collection_interval": 60 }
-    }
-  }
-}
-EOF
+cp /tmp/config/cloudwatch/mediawiki-cwa.json /opt/aws/amazon-cloudwatch-agent/etc/mediawiki-cwa.json
 
 # ── Install scripts on the AMI ────────────────────────────────────────────────
 mkdir -p /opt/mediawiki-ami
@@ -95,6 +51,7 @@ mkdir -p /opt/mediawiki-ami
 # ── Package cache cleanup ─────────────────────────────────────────────────────
 dnf clean all
 rm -rf /var/cache/dnf /tmp/*.tar.gz /tmp/*.gz /tmp/mw-*
+# /tmp/config is removed by 07-backup-setup.sh — it is needed through the final phase
 
 # ── Remove SSH host keys (regenerated on first boot) ─────────────────────────
 rm -f /etc/ssh/ssh_host_*

@@ -1,0 +1,61 @@
+{
+    "_comment": "Extensions for Asmbly Wiki (MW 1.43). Do NOT edit composer.json directly.",
+    "_comment_package_repos": "TemplateStyles, JsonConfig, and WikiCategoryTagCloud are declared as 'package' repositories because their upstream composer.json files lack a 'name' field, which causes Composer's 'vcs' driver to skip all branches with 'Unknown package has no name defined'. The 'package' type lets us supply the metadata inline so Composer never needs to parse the upstream composer.json.",
+    "repositories": [
+        {
+            "type": "package",
+            "package": {
+                "name": "mediawiki/template-styles",
+                "version": "dev-REL1_43",
+                "type": "mediawiki-extension",
+                "source": {
+                    "type": "git",
+                    "url": "https://gerrit.wikimedia.org/r/mediawiki/extensions/TemplateStyles",
+                    "reference": "REL1_43"
+                }
+            }
+        },
+        {
+            "type": "package",
+            "package": {
+                "name": "mediawiki/json-config",
+                "version": "dev-REL1_43",
+                "type": "mediawiki-extension",
+                "source": {
+                    "type": "git",
+                    "url": "https://gerrit.wikimedia.org/r/mediawiki/extensions/JsonConfig",
+                    "reference": "REL1_43"
+                }
+            }
+        },
+        {
+            "type": "package",
+            "package": {
+                "name": "mediawiki/wiki-category-tag-cloud",
+                "version": "dev-REL1_43",
+                "type": "mediawiki-extension",
+                "source": {
+                    "type": "git",
+                    "url": "https://gerrit.wikimedia.org/r/mediawiki/extensions/WikiCategoryTagCloud",
+                    "reference": "REL1_43"
+                }
+            }
+        }
+    ],
+    "require": {
+        "mediawiki/template-styles": "dev-REL1_43",
+        "mediawiki/json-config": "dev-REL1_43",
+        "mediawiki/wiki-category-tag-cloud": "dev-REL1_43",
+        "centertap/discourse-sso-consumer": "5.0.2",
+        "mediawiki/iframe-tag": "1.1.3"
+    },
+    "extra": {
+        "merge-plugin": {
+            "include": [
+                "extensions/*/composer.json",
+                "skins/*/composer.json"
+            ]
+        }
+    }
+}
+

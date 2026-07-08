@@ -26,7 +26,7 @@ variable "ami_name_prefix" {
 
 variable "mediawiki_version" {
   type        = string
-  default     = "1.43.0"
+  default     = "1.43.9"
   description = "MediaWiki release tarball version to install."
 }
 
@@ -75,20 +75,23 @@ variable "mw_upgrade_key" {
 variable "mw_smtp_password" {
   type        = string
   sensitive   = true
-  description = "Gmail app password for notification@asmbly.org. ROTATE before use — old value was exposed."
-  default     = ""
+  description = "Gmail app password for notification@asmbly.org."
 }
 
 variable "mw_discourse_secret" {
   type        = string
   sensitive   = true
-  description = "Discourse SSO shared secret ($wgDiscourseSsoConsumer_SsoSharedSecret). ROTATE before use — old value was exposed."
-  default     = ""
+  description = "Discourse SSO shared secret ($wgDiscourseSsoConsumer_SsoSharedSecret)."
+}
+
+variable "github_token" {
+  type        = string
+  sensitive   = true
+  description = "GitHub PAT (read:contents scope) used by 05-extensions.sh to clone third-party extensions without interactive auth."
 }
 
 variable "backup_bucket" {
   type        = string
-  default     = ""
   description = "S3 bucket name for automated backups.  Set post-launch if not known at build time."
 }
 

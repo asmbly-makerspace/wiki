@@ -36,6 +36,13 @@ bin/
 packer/*.auto.pkrvars.hcl
 packer/my.auto.pkrvars.hcl
 
+# Local test secrets for packer/test-local.sh — never commit
+packer-test/test.env
+
+# Local backup artefacts from make-backup — never commit
+packer-test/test-backups/
+values.sh
+
 # Packer build output
 output/
 

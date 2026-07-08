@@ -77,7 +77,7 @@ The resulting AMI ID is written to `output/packer-manifest.json`.
 Set all [required secrets](#required-github-secrets) in your repository, then push a tag:
 
 ```bash
-git tag ami/v1.43.0 && git push origin ami/v1.43.0
+git tag ami/v1.43.9 && git push origin ami/v1.43.9
 ```
 
 The workflow validates, builds, and annotates the tag with the AMI ID.

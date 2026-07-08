@@ -1,0 +1,63 @@
+# packer/Dockerfile.test
+# Local test image for iterating on provisioning scripts without provisioning an
+# AWS instance.  Build once (cached); subsequent test runs reuse the image.
+#
+#   podman build -t mediawiki-packer-test -f packer/Dockerfile.test packer/
+#   -- or --
+#   make test-build
+
+FROM amazonlinux:2023
+
+# ── Full system update + all packages used by the provisioning scripts ────────
+# This mirrors 00-system.sh and 01-php.sh so individual phase runs don't need
+# to re-download packages.
+RUN dnf update -y --skip-broken && \
+    dnf install -y \
+      # 00-system.sh deps
+      awscli wget git tar gzip bzip2 unzip jq vim htop lsof net-tools \
+      bind-utils nfs-utils python3 python3-pip lua diffutils cronie gettext findutils \
+      # 01-php.sh deps — pinned to PHP 8.3 (MediaWiki 1.43 requirement).
+      # AL2023 package naming: php8.3, php8.3-cli, php8.3-pecl-apcu, etc.
+      # Do NOT use the generic 'php' package — it tracks latest (currently 8.5)
+      # and will silently break extension compatibility checks.
+      php8.3 php8.3-cli php8.3-fpm php8.3-mysqlnd php8.3-xml \
+      php8.3-mbstring php8.3-intl php8.3-opcache php8.3-gd php8.3-zip \
+      php8.3-pecl-apcu \
+      # 03-httpd.sh deps
+      httpd mod_ssl \
+      # misc
+      shadow-utils procps \
+    && dnf clean all
+
+# ── Directories present on a full EC2 AMI but absent in the minimal image ────
+RUN mkdir -p \
+      /etc/sysctl.d \
+      /etc/security/limits.d \
+      /etc/php.d \
+      /etc/httpd/conf.d \
+      /var/www
+
+# ── Create the apache user/group that the scripts chown to ───────────────────
+RUN groupadd -r apache 2>/dev/null || true && \
+    useradd -r -g apache -d /var/www -s /sbin/nologin apache 2>/dev/null || true
+
+# ── Stub kernel/service tools not available in a rootless container ──────────
+# systemctl — service-aware mock: actually starts mariadb/httpd via direct
+# daemon launch; all other services are no-ops.
+COPY container-systemctl /usr/local/bin/systemctl
+RUN chmod +x /usr/local/bin/systemctl
+
+# sysctl — kernel parameter tuning (no-op in a container)
+RUN printf '#!/bin/bash\necho "[mock sysctl] $*"\n' \
+      > /usr/local/bin/sysctl && chmod +x /usr/local/bin/sysctl
+
+# timedatectl — timezone/NTP (not available without systemd)
+RUN printf '#!/bin/bash\necho "[mock timedatectl] $*"\n' \
+      > /usr/local/bin/timedatectl && chmod +x /usr/local/bin/timedatectl
+
+# swapoff — swap control (irrelevant in a container)
+RUN printf '#!/bin/bash\necho "[mock swapoff] $*"\n' \
+      > /usr/local/bin/swapoff && chmod +x /usr/local/bin/swapoff
+
+WORKDIR /repo
+

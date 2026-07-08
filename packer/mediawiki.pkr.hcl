@@ -74,14 +74,12 @@ build {
   sources = ["source.amazon-ebs.mediawiki"]
 
   # ── Upload config + scripts ───────────────────────────────────────────────
-  # File provisioners run first. 04-mediawiki.sh reads /tmp/LocalSettings.php.
+  # File provisioners run first.
+  #   - 04-mediawiki.sh reads /tmp/LocalSettings.php
+  #   - 05-extensions.sh reads /tmp/composer.local.json
   provisioner "file" {
-    sources = [
-      "${path.root}/../config/mediawiki/LocalSettings.php",
-      "${path.root}/../config/httpd/mediawiki.conf",
-      "${path.root}/../config/php/mediawiki.ini",
-    ]
-    destination = "/tmp/"
+    source      = "${path.root}/../config"
+    destination = "/tmp/config"
   }
 
   provisioner "file" {
@@ -108,7 +106,7 @@ build {
   # ── PHP 8.3 ──────────────────────────────────────────────────────────────
   provisioner "shell" {
     script           = "${path.root}/scripts/01-php.sh"
-    execute_command  = "sudo bash '{{ .Path }}'"
+    execute_command  = "{{ .Vars }} sudo -E bash '{{ .Path }}'"
     environment_vars = ["PHP_VERSION=${var.php_version}"]
     timeout          = "10m"
   }
@@ -116,7 +114,7 @@ build {
   # ── MariaDB 10.11 ─────────────────────────────────────────────────────────
   provisioner "shell" {
     script          = "${path.root}/scripts/02-mariadb.sh"
-    execute_command = "sudo bash '{{ .Path }}'"
+    execute_command = "{{ .Vars }} sudo -E bash '{{ .Path }}'"
     environment_vars = [
       "MW_DB_NAME=${var.mw_db_name}",
       "MW_DB_USER=${var.mw_db_user}",
@@ -135,7 +133,7 @@ build {
   # ── MediaWiki core + LocalSettings.php (envsubst from template) ──────────
   provisioner "shell" {
     script          = "${path.root}/scripts/04-mediawiki.sh"
-    execute_command = "sudo bash '{{ .Path }}'"
+    execute_command = "{{ .Vars }} sudo -E bash '{{ .Path }}'"
     environment_vars = [
       "MW_VERSION=${var.mediawiki_version}",
       "MW_DB_NAME=${var.mw_db_name}",
@@ -149,12 +147,15 @@ build {
     timeout = "15m"
   }
 
-  # ── Extensions (Gerrit REL1_43 + GitHub) ─────────────────────────────────
+  # ── Extensions (Composer + git fallback) ─────────────────────────────────
   provisioner "shell" {
-    script           = "${path.root}/scripts/05-extensions.sh"
-    execute_command  = "sudo bash '{{ .Path }}'"
-    environment_vars = ["MW_VERSION=${var.mediawiki_version}"]
-    timeout          = "20m"
+    script          = "${path.root}/scripts/05-extensions.sh"
+    execute_command = "{{ .Vars }} sudo -E bash '{{ .Path }}'"
+    environment_vars = [
+      "MW_VERSION=${var.mediawiki_version}",
+      "GITHUB_TOKEN=${var.github_token}",
+    ]
+    timeout = "20m"
   }
 
   # ── Finalize / harden ─────────────────────────────────────────────────────
@@ -167,7 +168,7 @@ build {
   # ── Backup cron setup ─────────────────────────────────────────────────────
   provisioner "shell" {
     script          = "${path.root}/scripts/07-backup-setup.sh"
-    execute_command = "sudo bash '{{ .Path }}'"
+    execute_command = "{{ .Vars }} sudo -E bash '{{ .Path }}'"
     environment_vars = [
       "BACKUP_BUCKET=${var.backup_bucket}",
       "AWS_REGION=${var.aws_region}",
@@ -184,7 +185,7 @@ build {
       "php /var/www/mediawiki/maintenance/checkDependencies.php || true",
       "systemctl is-enabled httpd mariadb crond",
     ]
-    execute_command = "sudo bash -c '{{ .Vars }} {{ .Path }}'"
+    execute_command = "sudo bash '{{ .Path }}'"
   }
 
   # ── Record the AMI metadata ───────────────────────────────────────────────

@@ -1,0 +1,31 @@
+# mediawiki.cnf — MariaDB tuning for a single-server MediaWiki instance
+# Uploaded to /tmp/ by Packer; installed by 02-mariadb.sh.
+# Target: t4g.medium (4 GB RAM). innodb_buffer_pool_size is the primary knob;
+# set to ~25% of RAM, leaving headroom for PHP-FPM, OPcache, and APCu.
+
+[mysqld]
+# InnoDB settings
+innodb_buffer_pool_size        = 512M
+innodb_log_file_size           = 64M
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method            = O_DIRECT
+
+# Character set
+character_set_server = utf8mb4
+collation_server     = utf8mb4_unicode_ci
+
+# Query cache (disabled in MariaDB 10.11 by default, but be explicit)
+query_cache_type = 0
+query_cache_size = 0
+
+# Logging — enable slow query log for debugging
+slow_query_log      = 1
+slow_query_log_file = /var/log/mariadb/slow.log
+long_query_time     = 2
+
+# Connections
+max_connections     = 100
+connect_timeout     = 10
+wait_timeout        = 600
+interactive_timeout = 600
+

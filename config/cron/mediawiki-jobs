@@ -1,0 +1,6 @@
+# mediawiki-jobs — cron.d job for the MediaWiki job queue runner
+# Uploaded to /tmp/ by Packer; installed by 06-finalize.sh.
+# MediaWiki job queue runner — runs every minute
+* * * * * apache php /var/www/mediawiki/maintenance/runJobs.php \
+    --maxtime=55 --quiet 2>/dev/null
+

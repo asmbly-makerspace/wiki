@@ -3,20 +3,12 @@
 # Phase 2: Install MariaDB 10.11 LTS, create MediaWiki DB and user.
 set -euxo pipefail
 
-MW_DB_NAME="${MW_DB_NAME:-mediawiki}"
-MW_DB_USER="${MW_DB_USER:-wiki}"
-MW_DB_PASSWORD="${MW_DB_PASSWORD:?MW_DB_PASSWORD must be set}"
+: "${MW_DB_NAME:?MW_DB_NAME must be set}"
+: "${MW_DB_USER:?MW_DB_USER must be set}"
+: "${MW_DB_PASSWORD:?MW_DB_PASSWORD must be set}"
 
 # ── Install MariaDB 10.11 from the official MariaDB repo ──────────────────────
-# AL2025 ships MariaDB 10.5; for 10.11 LTS we add the official repo.
-cat > /etc/yum.repos.d/mariadb.repo << 'EOF'
-[mariadb]
-name = MariaDB 10.11 LTS
-baseurl = https://downloads.mariadb.com/MariaDB/mariadb-10.11/yum/rhel/$releasever/$basearch
-gpgkey = https://downloads.mariadb.com/MariaDB/RPM-GPG-KEY-MariaDB
-gpgcheck = 1
-enabled = 1
-EOF
+cp /tmp/config/mariadb/mariadb.repo /etc/yum.repos.d/mariadb.repo
 
 dnf install -y MariaDB-server MariaDB-client
 
@@ -69,33 +61,7 @@ mysql << SQL
 SQL
 
 # ── MariaDB performance tuning for a single-server wiki ──────────────────────
-cat > /etc/my.cnf.d/mediawiki.cnf << 'EOF'
-[mysqld]
-# InnoDB settings
-innodb_buffer_pool_size        = 256M
-innodb_log_file_size           = 64M
-innodb_flush_log_at_trx_commit = 2
-innodb_flush_method            = O_DIRECT
-
-# Character set
-character_set_server = utf8mb4
-collation_server     = utf8mb4_unicode_ci
-
-# Query cache (disabled in MariaDB 10.11 by default, but be explicit)
-query_cache_type = 0
-query_cache_size = 0
-
-# Logging — enable slow query log for debugging
-slow_query_log      = 1
-slow_query_log_file = /var/log/mariadb/slow.log
-long_query_time     = 2
-
-# Connections
-max_connections     = 100
-connect_timeout     = 10
-wait_timeout        = 600
-interactive_timeout = 600
-EOF
+cp /tmp/config/mariadb/mediawiki.cnf /etc/my.cnf.d/mediawiki.cnf
 
 systemctl restart mariadb
 

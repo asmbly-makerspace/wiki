@@ -1,0 +1,15 @@
+# httpd-mediawiki — logrotate config for Apache MediaWiki logs
+# Uploaded to /tmp/ by Packer; installed by 03-httpd.sh.
+/var/log/httpd/mediawiki-*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    sharedscripts
+    postrotate
+        /usr/bin/systemctl reload httpd > /dev/null 2>&1 || true
+    endscript
+}
+
