@@ -149,13 +149,13 @@ build {
 
   # ── Extensions (Composer + git fallback) ─────────────────────────────────
   provisioner "shell" {
-    script           = "${path.root}/scripts/05-extensions.sh"
-    execute_command  = "{{ .Vars }} sudo -E bash '{{ .Path }}'"
+    script          = "${path.root}/scripts/05-extensions.sh"
+    execute_command = "{{ .Vars }} sudo -E bash '{{ .Path }}'"
     environment_vars = [
       "MW_VERSION=${var.mediawiki_version}",
       "GITHUB_TOKEN=${var.github_token}",
     ]
-    timeout          = "20m"
+    timeout = "20m"
   }
 
   # ── Finalize / harden ─────────────────────────────────────────────────────
