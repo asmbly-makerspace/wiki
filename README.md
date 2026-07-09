@@ -116,6 +116,22 @@ sudo BACKUP_BUCKET=my-mediawiki-backups \
 
 ---
 
+## Step 5b — Set up SSL
+
+Port 80 is immediately redirected to HTTPS.  The AMI ships with the `mod_ssl`
+self-signed cert as a placeholder, so browsers will show a security warning
+until certbot replaces it.  Once DNS is pointed at the new instance and port 443
+is reachable, obtain a real certificate:
+
+```bash
+sudo bash /opt/mediawiki-ami/setup/setup-ssl.sh
+```
+
+This runs `certbot --apache`, obtains a Let's Encrypt cert for `wiki.asmbly.org`,
+updates the `:443` vhost in `mediawiki.conf`, and installs the renewal timer.
+
+---
+
 ## Step 6 — Validate & cut over
 
 ```bash
@@ -155,6 +171,7 @@ via `/etc/cron.d/mediawiki-backup`. It uploads to S3 with GFS rotation:
 ```
 config/
   mediawiki/LocalSettings.php   ← Config-as-code; secrets injected by envsubst at build time
+  mediawiki/assets/             ← Static assets copied to DocumentRoot (logos, favicons)
   httpd/mediawiki.conf          ← Apache vhost template
   php/mediawiki.ini             ← PHP tuning
 
@@ -184,6 +201,7 @@ scripts/
   backup/config-export.sh           Redacted config export → S3
   restore/restore.sh                Restore DB + images from S3 (reusable)
   restore/upgrade-1.35-to-1.43.sh  One-time: run update.php + post-upgrade maintenance
+  setup/setup-ssl.sh                Post-launch: obtain Let's Encrypt cert via certbot
 
 .github/workflows/
   build-ami.yml           Packer build on tag push / manual dispatch

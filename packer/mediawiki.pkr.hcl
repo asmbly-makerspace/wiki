@@ -54,7 +54,7 @@ source "amazon-ebs" "mediawiki" {
 
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
-    volume_size           = 30
+    volume_size           = 16
     volume_type           = "gp3"
     delete_on_termination = true
     encrypted             = false
