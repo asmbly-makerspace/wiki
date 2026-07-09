@@ -63,7 +63,12 @@ _mariadb_stop() {
 
 _httpd_start() {
   echo "[systemctl-mock] Starting httpd directly (no systemd)..."
-  httpd -k start 2>/dev/null || apachectl start 2>/dev/null || true
+  httpd -t || { echo "[systemctl-mock] ERROR: httpd config check failed" >&2; return 1; }
+  httpd -k start 2>/dev/null || apachectl start 2>/dev/null || {
+    echo "[systemctl-mock] ERROR: httpd failed to start — check /var/log/httpd/error_log" >&2
+    cat /var/log/httpd/error_log 2>/dev/null | tail -20 || true
+    return 1
+  }
 }
 
 _httpd_stop() {
