@@ -12,9 +12,7 @@
 #   MW_SECRET_KEY           — generate: openssl rand -hex 64
 #   MW_UPGRADE_KEY          — generate: openssl rand -hex 16
 #   MW_SMTP_PASSWORD        — Gmail app password for notification@asmbly.org
-#                             ⚠ ROTATE THIS — old value was exposed in info.txt
 #   MW_DISCOURSE_SECRET     — Discourse SSO shared secret
-#                             ⚠ ROTATE THIS — old value was exposed in info.txt
 #
 # Derived from the MediaWiki 1.35.8 LocalSettings.php captured in output/info.txt
 # and translated to 1.43 conventions. Changes from 1.35:
@@ -47,7 +45,7 @@ $wgUsePathInfo     = true;
 # =============================================================================
 
 $wgLogo    = "$wgScriptPath/ASMBLY_Avatar_135x135.png";
-$wgFavicon = "$wgScriptPath/ASMBLY_avatar-1-150x150.png";
+$wgFavicon = "$wgScriptPath/ASMBLY_Avatar-150x150.png";
 
 $wgLogos = [
     '1x'   => "$wgScriptPath/ASMBLY_Avatar_135x135.png",
@@ -130,7 +128,6 @@ $wgEnotifWatchlist  = true;
 $wgEmailAuthentication = false;
 
 # Gmail SMTP relay
-# ⚠ MW_SMTP_PASSWORD must be rotated — old value was exposed in repo history
 $wgSMTP = [
     'host'     => 'ssl://smtp.gmail.com',
     'IDHost'   => 'gmail.com',
@@ -211,7 +208,6 @@ wfLoadExtension( 'PageImages' );
 wfLoadExtension( 'ParserFunctions' );
 wfLoadExtension( 'PdfHandler' );
 wfLoadExtension( 'Poem' );
-wfLoadExtension( 'RenameUser' );
 wfLoadExtension( 'ReplaceText' );
 wfLoadExtension( 'SecureLinkFixer' );
 wfLoadExtension( 'SpamBlacklist' );
@@ -284,40 +280,34 @@ $iFrameDomains = [
 
 # ── PluggableAuth v7 + DiscourseSsoConsumer ───────────────────────────────────
 #
-# PluggableAuth v7 (required for MW 1.39+) changed from flat global variables
-# to a $wgPluggableAuth_Config array. The old 1.35 config used:
-#   $wgPluggableAuth_ButtonLabelMessage = "Log In With Discourse";
-# which is removed in v7.
-#
-# The button label is now the array key in $wgPluggableAuth_Config.
-# See: https://www.mediawiki.org/wiki/Extension:PluggableAuth#Configuration
-#
-# ⚠ MW_DISCOURSE_SECRET must be rotated — old value was exposed in repo history
 wfLoadExtension( 'PluggableAuth' );
 wfLoadExtension( 'DiscourseSsoConsumer' );
 
 $wgPluggableAuth_Config = [
-    'Log In With Discourse' => [
-        'plugin' => 'DiscourseSsoConsumer',
-        'data'   => [],
-    ],
+    'Log In With Discourse' => [ 'plugin' => 'DiscourseSsoConsumer' ],
 ];
 
 # Uncomment to allow local admin login alongside Discourse SSO:
 # $wgPluggableAuth_EnableLocalLogin = true;
 
-$wgDiscourseSsoConsumer_DiscourseUrl        = "https://yo.asmbly.org";
-$wgDiscourseSsoConsumer_SsoSharedSecret     = "${MW_DISCOURSE_SECRET}";
-$wgDiscourseSsoConsumer_ExposeName          = true;
-$wgDiscourseSsoConsumer_ExposeEmail         = false;
-$wgDiscourseSsoConsumer_EnableAutoRelogin   = true;
-
-# Discourse group → MediaWiki group mapping
-# Discourse groups 'makers' and 'community' → MW 'editor'
-# Discourse groups 'sysops' and 'leadership' → MW 'sysop' and 'bureaucrat'
-$wgDiscourseSsoConsumer_GroupMaps = [
-    'editor'     => [ 'makers', 'community' ],
-    'sysop'      => [ 'sysops', 'leadership' ],
-    'bureaucrat' => [ 'sysops', 'leadership' ],
-];
+# DiscourseSsoConsumer uses a hook-based config (flat globals removed in 6.x).
+# See: https://codeberg.org/centertap/DiscourseSsoConsumer#configure-discoursessoconsumer-using-a-hook-function
+$wgHooks['DiscourseSsoConsumer_Configure'][] =
+    function ( array &$config ) {
+        $config['DiscourseUrl']            = 'https://yo.asmbly.org';
+        $config['Sso']['Enable']           = true;
+        $config['Sso']['SharedSecret']     = '${MW_DISCOURSE_SECRET}';
+        $config['Sso']['EnableAutoRelogin'] = true;
+        $config['User']['ExposeName']      = true;
+        $config['User']['ExposeEmail']     = false;
+        # Discourse group → MediaWiki group mapping
+        # 'makers' and 'community' → editor
+        # 'sysops' and 'leadership' → sysop + bureaucrat
+        $config['User']['GroupMaps'] = [
+            'editor'     => [ 'makers', 'community' ],
+            'sysop'      => [ 'sysops', 'leadership' ],
+            'bureaucrat' => [ 'sysops', 'leadership' ],
+        ];
+        return true;
+    };
 

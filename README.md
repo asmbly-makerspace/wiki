@@ -116,6 +116,22 @@ sudo BACKUP_BUCKET=my-mediawiki-backups \
 
 ---
 
+## Step 5b — Set up SSL
+
+Port 80 is immediately redirected to HTTPS.  The AMI ships with the `mod_ssl`
+self-signed cert as a placeholder, so browsers will show a security warning
+until certbot replaces it.  Once DNS is pointed at the new instance and port 443
+is reachable, obtain a real certificate:
+
+```bash
+sudo bash /opt/mediawiki-ami/setup/setup-ssl.sh
+```
+
+This runs `certbot --apache`, obtains a Let's Encrypt cert for `wiki.asmbly.org`,
+updates the `:443` vhost in `mediawiki.conf`, and installs the renewal timer.
+
+---
+
 ## Step 6 — Validate & cut over
 
 ```bash
@@ -139,7 +155,7 @@ When satisfied:
 
 ## Automated backups (new server)
 
-The new server runs `scripts/backup/backup-with-retention.sh` nightly at 02:00 UTC
+The new server runs `scripts/backup/backup-with-retention.sh` nightly at 08:00 UTC
 via `/etc/cron.d/mediawiki-backup`. It uploads to S3 with GFS rotation:
 
 | Tier | When | S3 prefix | Expires |
@@ -154,27 +170,53 @@ via `/etc/cron.d/mediawiki-backup`. It uploads to S3 with GFS rotation:
 
 ```
 config/
-  mediawiki/LocalSettings.php   ← Config-as-code; secrets injected by envsubst at build time
-  httpd/mediawiki.conf          ← Apache vhost template
-  php/mediawiki.ini             ← PHP tuning
+  cloudwatch/mediawiki-cwa.json   ← CloudWatch agent config
+  cron/mediawiki-backup           ← Cron job definitions
+  cron/mediawiki-jobs             ← MediaWiki job runner cron
+  httpd/mediawiki.conf            ← Apache vhost template
+  httpd/security.conf             ← Apache security headers
+  logrotate/httpd-mediawiki       ← Log rotation for Apache
+  logrotate/mediawiki-backup      ← Log rotation for backups
+  mariadb/mariadb.repo            ← MariaDB 10.11 yum repo
+  mariadb/mediawiki.cnf           ← MariaDB tuning
+  mediawiki/LocalSettings.php     ← Config-as-code; secrets injected by envsubst at build time
+  mediawiki/composer.local.json   ← Composer local overrides
+  mediawiki/robots.txt            ← robots.txt for the wiki
+  mediawiki/assets/               ← Static assets copied to DocumentRoot (logos, favicons)
+  php/mediawiki.ini               ← PHP tuning
+  system/limits.conf              ← OS limits
+  system/mediawiki-backup.sysconfig ← /etc/sysconfig for backup cron
+  system/sysctl.conf              ← Kernel tuning
 
 docs/
-  lifecycle.json                ← S3 Lifecycle Rules (apply once to bucket)
-  s3-backup-setup.md            ← Bucket setup walkthrough
+  lifecycle.json                  ← S3 Lifecycle Rules (apply once to bucket)
+  s3-backup-setup.md              ← Bucket setup walkthrough
+  iam/README.md                   ← IAM setup guide
+  iam/oidc-trust-policy.json      ← OIDC trust policy for GitHub Actions
+  iam/packer-policy.json          ← Minimal IAM policy for Packer
+  iam/setup-oidc-role.sh          ← Script to create OIDC role
+  iam/setup-vpc.sh                ← Script to create VPC for Packer
 
 packer/
-  mediawiki.pkr.hcl             ← Packer HCL2 build template
-  variables.pkr.hcl             ← Variable declarations
-  variables.pkrvars.hcl.example ← Copy → my.auto.pkrvars.hcl and fill in
+  mediawiki.pkr.hcl               ← Packer HCL2 build template
+  variables.pkr.hcl               ← Variable declarations
+  variables.pkrvars.example       ← Copy → my.auto.pkrvars.hcl and fill in
   scripts/
-    00-system.sh                AL2025 base packages (lua, cronie, gettext, …)
-    01-php.sh                   PHP 8.3 + extensions
-    02-mariadb.sh               MariaDB 10.11 LTS
-    03-httpd.sh                 Apache httpd + vhost
-    04-mediawiki.sh             MW 1.43 core + envsubst → LocalSettings.php
-    05-extensions.sh            REL1_43 extensions (Gerrit + GitHub)
-    06-finalize.sh              Harden, clean, enable services
-    07-backup-setup.sh          Install backup cron + /etc/sysconfig/mediawiki-backup
+    00-system.sh                  AL2023 base packages (lua, cronie, gettext, …)
+    01-php.sh                     PHP 8.3 + extensions
+    02-mariadb.sh                 MariaDB 10.11 LTS
+    03-httpd.sh                   Apache httpd + vhost
+    04-mediawiki.sh               MW 1.43 core + envsubst → LocalSettings.php
+    05-extensions.sh              REL1_43 extensions (Gerrit + GitHub)
+    06-finalize.sh                Harden, clean, enable services
+    07-backup-setup.sh            Install backup cron + /etc/sysconfig/mediawiki-backup
+
+packer-test/
+  Dockerfile.test                 ← Container image for local packer script testing
+  test-local.sh                   ← Run packer scripts locally in Docker
+  mock-aws                        ← Stub AWS CLI for offline testing
+  container-systemctl             ← systemctl shim for containers
+  test.env.example                ← Copy → test.env and fill in
 
 scripts/
   inventory/gather-info.sh          Server inventory report
@@ -184,12 +226,12 @@ scripts/
   backup/config-export.sh           Redacted config export → S3
   restore/restore.sh                Restore DB + images from S3 (reusable)
   restore/upgrade-1.35-to-1.43.sh  One-time: run update.php + post-upgrade maintenance
+  setup/setup-ssl.sh                Post-launch: obtain Let's Encrypt cert via certbot
 
 .github/workflows/
   build-ami.yml           Packer build on tag push / manual dispatch
+  packer-validate.yml     Validate packer template on pull requests
 
-output/
-  info.txt                Inventory captured from the existing 1.35 server
 ```
 
 ---

@@ -1,0 +1,48 @@
+# robots.txt for wiki.asmbly.org
+#
+# All article content is open to crawlers via BOTH URL forms:
+#   /wiki/Article_Title          (short URL, canonical)
+#   /index.php?title=Article     (legacy URL — must remain crawlable for SEO)
+#
+# We block only the dynamic/action URL variants that generate high server load
+# without producing indexable content.
+#
+# References:
+#   https://www.mediawiki.org/wiki/Manual:Robots.txt
+#   https://en.wikipedia.org/robots.txt
+
+User-agent: *
+
+# ── Special pages ─────────────────────────────────────────────────────────────
+# Dynamically generated; no indexable article content.
+Disallow: /wiki/Special:
+Disallow: /wiki/Special%3A
+Disallow: /index.php?title=Special:
+Disallow: /index.php?title=Special%3A
+
+# ── Action pages (edit, history, info, raw, submit, etc.) ─────────────────────
+# Per-request DB queries with no index value.
+Disallow: /*?action=
+Disallow: /index.php?action=
+
+# ── Diff and revision-comparison pages ───────────────────────────────────────
+Disallow: /*?diff=
+Disallow: /index.php?diff=
+Disallow: /index.php?oldid=
+
+# ── Particular dynamic pages ───────────────────────────────────────
+Disallow: /index.php?title=Help
+Disallow: /index.php?title=Image
+Disallow: /index.php?title=MediaWiki
+Disallow: /index.php?title=Special:
+Disallow: /index.php?title=Template
+
+# ── Printable versions (duplicate content) ────────────────────────────────────
+Disallow: /*?printable=yes
+
+# ── Allow the Internet Archiver to index action=raw and thereby store the raw wikitext of pages ────────────────────────────────────
+User-agent: ia_archiver
+Allow: /*&action=raw
+
+# ── Crawl-delay: limit load on a small-instance server ───────────────────────
+Crawl-delay: 1

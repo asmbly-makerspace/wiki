@@ -83,4 +83,22 @@ mkdir -p "${MW_ROOT}/cache"
 chown apache:apache "${MW_ROOT}/cache"
 chmod 775 "${MW_ROOT}/cache"
 
+# ── robots.txt ───────────────────────────────────────────────────────────────
+cp /tmp/config/mediawiki/robots.txt "${MW_ROOT}/robots.txt"
+chown root:apache "${MW_ROOT}/robots.txt"
+chmod 644 "${MW_ROOT}/robots.txt"
+
+# ── Static assets (logos, favicons) ──────────────────────────────────────────
+# Files committed to config/mediawiki/assets/ are served from the DocumentRoot
+# because $wgScriptPath = "".  Copy any non-hidden files that exist.
+ASSETS_SRC="/tmp/config/mediawiki/assets"
+if compgen -G "${ASSETS_SRC}/*" > /dev/null 2>&1; then
+  cp "${ASSETS_SRC}"/* "${MW_ROOT}/"
+  chown root:apache "${MW_ROOT}"/*.png "${MW_ROOT}"/*.ico 2>/dev/null || true
+  chmod 644 "${MW_ROOT}"/*.png "${MW_ROOT}"/*.ico 2>/dev/null || true
+  echo "Installed static assets from ${ASSETS_SRC}"
+else
+  echo "WARNING: no static assets found in ${ASSETS_SRC} — logos will be missing until added"
+fi
+
 echo "04-mediawiki.sh complete — MediaWiki ${MW_VERSION} installed at ${MW_ROOT}"
