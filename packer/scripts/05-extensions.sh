@@ -137,6 +137,14 @@ export COMPOSER_ALLOW_SUPERUSER=1
 composer update --no-dev --no-interaction --prefer-dist --optimize-autoloader
 echo "Composer update completed successfully"
 
+# ── Patch DiscourseSsoConsumer 5.0.2 for MW 1.37+ ────────────────────────────
+# DB_MASTER was renamed to DB_PRIMARY in MW 1.37 and removed in 1.42.
+# The 6.x release that fixed this requires PHP 8.4, which MW 1.43 does not
+# support. Patch the installed source directly; DB_PRIMARY has the same value.
+echo "Patching DiscourseSsoConsumer: DB_MASTER → DB_PRIMARY"
+grep -rl --include='*.php' 'DB_MASTER' "${EXT_DIR}/DiscourseSsoConsumer" \
+  | xargs sed -i 's/\bDB_MASTER\b/DB_PRIMARY/g'
+
 EXPECTED_EXTENSIONS=("TemplateStyles" "DiscourseSsoConsumer" "IFrameTag" "PluggableAuth" "JsonConfig" "WikiCategoryTagCloud")
 for ext in "${EXPECTED_EXTENSIONS[@]}"; do
   if [ ! -d "${EXT_DIR}/${ext}" ]; then

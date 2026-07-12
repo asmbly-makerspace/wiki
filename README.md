@@ -100,10 +100,10 @@ SSH into the new instance as `ec2-user`, then:
 ```bash
 # Restore DB + images from S3
 sudo BACKUP_BUCKET=my-mediawiki-backups \
-  bash /opt/mediawiki-ami/restore/restore.sh
+  bash /opt/mediawiki-ami/restore.sh
 
 # Run the one-time 1.35 → 1.43 schema migration
-sudo bash /opt/mediawiki-ami/restore/upgrade-1.35-to-1.43.sh
+sudo bash /opt/mediawiki-ami/upgrade-1.35-to-1.43.sh
 ```
 
 To restore from a specific backup rather than the latest daily:
@@ -111,32 +111,16 @@ To restore from a specific backup rather than the latest daily:
 ```bash
 sudo BACKUP_BUCKET=my-mediawiki-backups \
   BACKUP_TIMESTAMP=weekly/2026-W24 \
-  bash /opt/mediawiki-ami/restore/restore.sh
+  bash /opt/mediawiki-ami/restore.sh
 ```
 
 ---
 
-## Step 5b — Set up SSL
-
-Port 80 is immediately redirected to HTTPS.  The AMI ships with the `mod_ssl`
-self-signed cert as a placeholder, so browsers will show a security warning
-until certbot replaces it.  Once DNS is pointed at the new instance and port 443
-is reachable, obtain a real certificate:
-
-```bash
-sudo bash /opt/mediawiki-ami/setup/setup-ssl.sh
-```
-
-This runs `certbot --apache`, obtains a Let's Encrypt cert for `wiki.asmbly.org`,
-updates the `:443` vhost in `mediawiki.conf`, and installs the renewal timer.
-
----
-
-## Step 6 — Validate & cut over
+## Step 6 — Pre-cutover validation
 
 ```bash
 # Confirm MW version and extension list
-curl -s https://wiki.asmbly.org/wiki/Special:Version   # (via /etc/hosts override)
+curl -s http://localhost/wiki/Special:Version
 
 # Check update.php log for errors
 cat /tmp/mw-update-*.txt
@@ -149,7 +133,23 @@ sudo cat /etc/sysconfig/mediawiki-backup   # confirm BACKUP_BUCKET is set
 When satisfied:
 
 1. Move the Elastic IP to the new instance
-2. Keep the old instance **stopped** (not terminated) for 72 hours as a rollback option
+2. Confirm DNS resolves to the new instance (`dig wiki.asmbly.org`)
+3. Keep the old instance **stopped** (not terminated) for 72 hours as a rollback option
+
+---
+
+## Step 7 — Set up SSL
+
+Port 80 is immediately redirected to HTTPS.  The AMI ships with the `mod_ssl`
+self-signed cert as a placeholder.  Now that the Elastic IP is attached and DNS
+resolves to this instance, obtain a real certificate:
+
+```bash
+sudo bash /opt/mediawiki-ami/setup-ssl.sh
+```
+
+This runs `certbot --apache`, obtains a Let's Encrypt cert for `wiki.asmbly.org`,
+updates the `:443` vhost in `mediawiki.conf`, and installs the renewal timer.
 
 ---
 

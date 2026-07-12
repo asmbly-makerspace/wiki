@@ -33,5 +33,21 @@ certbot --apache \
 systemctl reload httpd
 
 log "SSL configured for ${DOMAIN}"
-log "Auto-renewal: $(systemctl is-enabled certbot-renew.timer 2>/dev/null || echo 'check /etc/cron.d/certbot')"
+
+# Enable the certbot renewal timer.  The default renew-before-expiry is 30 days,
+# which means certs are renewed at the 60-day mark of their 90-day lifetime.
+# Wire in an Apache reload as a deploy hook so the new cert is picked up
+# without manual intervention.
+DEPLOY_HOOK=/etc/letsencrypt/renewal-hooks/deploy/reload-httpd.sh
+cat > "${DEPLOY_HOOK}" <<'EOF'
+#!/usr/bin/env bash
+systemctl reload httpd
+EOF
+chmod 755 "${DEPLOY_HOOK}"
+
+systemctl enable --now certbot-renew.timer
+
+log "Auto-renewal enabled (renews 30 days before expiry — at the 60-day mark)"
+log "Timer status: $(systemctl is-enabled certbot-renew.timer)"
+log "Next run:     $(systemctl list-timers certbot-renew.timer --no-pager 2>/dev/null | awk 'NR==2{print $1,$2}')"
 
