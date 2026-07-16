@@ -1,49 +1,10 @@
 #!/usr/bin/env bash
 # packer/scripts/05-extensions.sh
-# Phase 5: Install MediaWiki extensions compatible with 1.43 (REL1_43 branch).
+# Phase 5: Install MediaWiki extensions compatible with 1.43 (REL1_43 branch)
+# via Composer, using config/mediawiki/composer.local.json.
 #
-# INSTALLATION STRATEGY:
-#   This script uses Composer (the dependency manager bundled with MediaWiki's
-#   ecosystem) to install extensions, following MediaWiki best practices:
-#     - https://www.mediawiki.org/wiki/Composer/For_extensions
-#     - https://www.mediawiki.org/wiki/Manual:Composer.json_best_practices
-#
-#   Key principle: NEVER modify MediaWiki's composer.json directly.
-#   Instead, extensions are declared in composer.local.json which is merged
-#   automatically by the wikimedia/composer-merge-plugin already configured
-#   in MediaWiki core's composer.json.
-#
-# EXTENSION CATEGORIES:
-#
-#   Bundled in MW 1.43 (no installation needed — just wfLoadExtension):
-#   AbuseFilter CategoryTree Cite CiteThisPage CodeEditor ConfirmEdit
-#   DiscussionTools Echo Gadgets ImageMap InputBox Interwiki Linter
-#   LoginNotify Math MultimediaViewer Nuke OATHAuth PageImages
-#   ParserFunctions PdfHandler Poem README ReplaceText Scribunto
-#   SecureLinkFixer SpamBlacklist SyntaxHighlight_GeSHi TemplateData
-#   TextExtracts Thanks TitleBlacklist VisualEditor WikiEditor
-#
-#   Installed via Composer (composer.local.json):
-#     DiscourseSsoConsumer (-> PluggableAuth), IFrameTag
-#     TemplateStyles, JsonConfig, PluggableAuth, WikiCategoryTagCloud
-#
-#   NOTE: TemplateStyles, JsonConfig, and WikiCategoryTagCloud are declared as
-#   "package" repositories (not "vcs") in composer.local.json because their
-#   upstream composer.json files lack a "name" field.  Composer's "vcs" driver
-#   requires a name to resolve the package and skips branches without one
-#   ("Unknown package has no name defined").  The "package" type lets us supply
-#   the metadata inline, bypassing that requirement entirely.
-#
-# HOW TO ADD/UPDATE AN EXTENSION:
-#   1. Add a VCS repository entry in config/mediawiki/composer.local.json
-#   2. Add the package "require" line with the correct version constraint
-#   3. For Gerrit extensions: use "dev-REL1_XX" matching the MW branch
-#   4. For tagged releases: use the semver tag (e.g. "5.0.2")
-#   5. Run this script (or `composer update --no-dev` in the MW root)
-#   6. Add the corresponding wfLoadExtension()/config to
-#      config/mediawiki/LocalSettings.php — the ONLY place extension loading
-#      and configuration is defined. This script does not write to
-#      LocalSettings.php; it only installs code into extensions/.
+# See README.md § "MediaWiki extensions" for installation strategy,
+# extension categories, and how to add/update an extension.
 
 set -euxo pipefail
 
@@ -161,8 +122,7 @@ done
 # ── Fix ownership ─────────────────────────────────────────────────────────────
 chown -R apache:apache "${EXT_DIR}"
 
-# NOTE: extension loading (wfLoadExtension/wfLoadSkin) and all extension
-# configuration live SOLELY in config/mediawiki/LocalSettings.php — the
-# single source of truth deployed by 04-mediawiki.sh.
+# Extension loading/config lives solely in config/mediawiki/LocalSettings.php
+# (deployed by 04-mediawiki.sh); this script only installs code into extensions/.
 
 echo "05-extensions.sh complete"

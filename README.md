@@ -262,3 +262,73 @@ role that eliminates the need for long-lived access keys entirely.
 | `MW_DISCOURSE_SECRET` | Discourse SSO shared secret ⚠ rotate |
 | `BACKUP_BUCKET` | S3 bucket name for backups |
 
+---
+
+## MediaWiki extensions
+
+`packer/scripts/05-extensions.sh` installs extensions via Composer, following
+MediaWiki best practices
+([Composer/For_extensions](https://www.mediawiki.org/wiki/Composer/For_extensions),
+[Composer.json_best_practices](https://www.mediawiki.org/wiki/Manual:Composer.json_best_practices)).
+
+**Key principle:** never modify MediaWiki core's `composer.json` directly.
+Extensions are declared in `config/mediawiki/composer.local.json`, which is
+merged automatically by the `wikimedia/composer-merge-plugin` already
+configured in core's `composer.json`.
+
+**Extension categories:**
+
+- **Bundled in MW 1.43** (no installation needed — just `wfLoadExtension`):
+  AbuseFilter, CategoryTree, Cite, CiteThisPage, CodeEditor, ConfirmEdit,
+  DiscussionTools, Echo, Gadgets, ImageMap, InputBox, Interwiki, Linter,
+  LoginNotify, Math, MultimediaViewer, Nuke, OATHAuth, PageImages,
+  ParserFunctions, PdfHandler, Poem, README, ReplaceText, Scribunto,
+  SecureLinkFixer, SpamBlacklist, SyntaxHighlight_GeSHi, TemplateData,
+  TextExtracts, Thanks, TitleBlacklist, VisualEditor, WikiEditor
+- **Installed via Composer** (`composer.local.json`): DiscourseSsoConsumer
+  (→ PluggableAuth), IFrameTag, TemplateStyles, JsonConfig, PluggableAuth,
+  WikiCategoryTagCloud
+
+  > TemplateStyles, JsonConfig, and WikiCategoryTagCloud are declared as
+  > `"package"` repositories (not `"vcs"`) because their upstream
+  > `composer.json` files lack a `"name"` field. Composer's `vcs` driver
+  > requires a name to resolve the package and skips branches without one
+  > (`"Unknown package has no name defined"`). The `"package"` type supplies
+  > the metadata inline, bypassing that requirement.
+
+**How to add or update an extension:**
+
+1. Add a VCS repository entry in `config/mediawiki/composer.local.json`.
+2. Add the package `require` line with the correct version constraint.
+3. For Gerrit extensions, use `dev-REL1_XX` matching the MW branch.
+4. For tagged releases, use the semver tag (e.g. `5.0.2`).
+5. Run `packer/scripts/05-extensions.sh` (or `composer update --no-dev` in
+   the MW root) to verify resolution.
+6. Add the corresponding `wfLoadExtension()`/config to
+   `config/mediawiki/LocalSettings.php` — the **only** place extension
+   loading and configuration is defined. `05-extensions.sh` only installs
+   code into `extensions/`; it never writes to `LocalSettings.php`.
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome.
+
+- **Adding/updating a MediaWiki extension** — see
+  [MediaWiki extensions](#mediawiki-extensions) above.
+- **Changing build scripts** (`packer/scripts/*.sh`) — validate locally with
+  `packer-test/test-local.sh` before opening a PR; it runs the scripts in a
+  container against `mock-aws` without needing real AWS credentials.
+- **Changing the Packer template** — run
+  `packer validate -var-file=my.auto.pkrvars.hcl packer/` and, where
+  feasible, a full `packer build` against a scratch VPC.
+- **Changing backup/restore scripts** (`scripts/backup/`, `scripts/restore/`)
+  — test against a disposable bucket/instance; these scripts touch
+  production data paths.
+- Keep secrets out of commits and PR descriptions; use the
+  `PKR_VAR_*`/GitHub Secrets mechanisms documented above.
+- Open a PR against `main`; CI runs `packer-validate.yml` on every PR and
+  `build-ami.yml` on tag pushes.
+
+
