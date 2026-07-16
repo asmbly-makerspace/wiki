@@ -40,6 +40,10 @@
 #   3. For Gerrit extensions: use "dev-REL1_XX" matching the MW branch
 #   4. For tagged releases: use the semver tag (e.g. "5.0.2")
 #   5. Run this script (or `composer update --no-dev` in the MW root)
+#   6. Add the corresponding wfLoadExtension()/config to
+#      config/mediawiki/LocalSettings.php — the ONLY place extension loading
+#      and configuration is defined. This script does not write to
+#      LocalSettings.php; it only installs code into extensions/.
 
 set -euxo pipefail
 
@@ -141,6 +145,7 @@ echo "Composer update completed successfully"
 # DB_MASTER was renamed to DB_PRIMARY in MW 1.37 and removed in 1.42.
 # The 6.x release that fixed this requires PHP 8.4, which MW 1.43 does not
 # support. Patch the installed source directly; DB_PRIMARY has the same value.
+# TODO: [16-Jul-2026 04:01:55 UTC] PHP Deprecated:  Use of wfGetDB was deprecated in MediaWiki 1.39. [Called from MediaWiki\Extension\DiscourseSsoConsumer\Db::ensureCurrentSchema in /var/www/mediawiki/extensions/DiscourseSsoConsumer/src/Db.php at line 83] in /var/www/mediawiki/includes/debug/MWDebug.php on line 385
 echo "Patching DiscourseSsoConsumer: DB_MASTER → DB_PRIMARY"
 grep -rl --include='*.php' 'DB_MASTER' "${EXT_DIR}/DiscourseSsoConsumer" \
   | xargs sed -i 's/\bDB_MASTER\b/DB_PRIMARY/g'
@@ -156,123 +161,8 @@ done
 # ── Fix ownership ─────────────────────────────────────────────────────────────
 chown -R apache:apache "${EXT_DIR}"
 
-# ── Append extension loading to LocalSettings.php ─────────────────────────────
-LSETTINGS="${MW_ROOT}/LocalSettings.php"
-{
-  echo ""
-  echo "# === Bundled extensions (shipped with MW 1.43 tarball) ==="
-  echo "wfLoadExtension( 'AbuseFilter' );"
-  echo "wfLoadExtension( 'CategoryTree' );"
-  echo "wfLoadExtension( 'Cite' );"
-  echo "wfLoadExtension( 'CiteThisPage' );"
-  echo "wfLoadExtension( 'CodeEditor' );"
-  echo "wfLoadExtension( 'ConfirmEdit' );"
-  echo "wfLoadExtension( 'DiscussionTools' );"
-  echo "wfLoadExtension( 'Echo' );"
-  echo "wfLoadExtension( 'Gadgets' );"
-  echo "wfLoadExtension( 'ImageMap' );"
-  echo "wfLoadExtension( 'InputBox' );"
-  echo "wfLoadExtension( 'Interwiki' );"
-  echo "wfLoadExtension( 'Linter' );"
-  echo "wfLoadExtension( 'LoginNotify' );"
-  echo "wfLoadExtension( 'Math' );"
-  echo "wfLoadExtension( 'MultimediaViewer' );"
-  echo "wfLoadExtension( 'Nuke' );"
-  echo "wfLoadExtension( 'OATHAuth' );"
-  echo "wfLoadExtension( 'PageImages' );"
-  echo "wfLoadExtension( 'ParserFunctions' );"
-  echo "wfLoadExtension( 'PdfHandler' );"
-  echo "wfLoadExtension( 'Poem' );"
-  echo "wfLoadExtension( 'ReplaceText' );"
-  echo "wfLoadExtension( 'SecureLinkFixer' );"
-  echo "wfLoadExtension( 'SpamBlacklist' );"
-  echo "wfLoadExtension( 'SyntaxHighlight_GeSHi' );"
-  echo "wfLoadExtension( 'TemplateData' );"
-  echo "wfLoadExtension( 'TextExtracts' );"
-  echo "wfLoadExtension( 'Thanks' );"
-  echo "wfLoadExtension( 'TitleBlacklist' );"
-  echo "wfLoadExtension( 'VisualEditor' );"
-  echo "wfLoadExtension( 'WikiEditor' );"
-  echo ""
-  echo "# AbuseFilter — rule-based anti-spam/vandalism filters"
-  echo "\$wgAbuseFilterActions = ['throttle' => true, 'warn' => true, 'disallow' => true,"
-  echo "    'blockautopromote' => true, 'block' => true, 'tag' => true];"
-  echo ""
-  echo "# LoginNotify — notifies users of logins from new devices/locations"
-  echo "\$wgLoginNotifyUseEcho = true;"
-  echo ""
-  echo "# Math — LaTeX formula rendering (useful for electronics/physics pages)"
-  echo "\$wgDefaultUserOptions['math'] = 'mathml';"
-  echo ""
-  echo "# === Extensions installed via Composer (composer.local.json) ==="
-  for item in "${EXPECTED_EXTENSIONS[@]}"; do
-    echo "wfLoadExtension( '${item}' );"
-  done
-  echo ""
-  echo "# === Skins (all four ship with the MW 1.43 tarball) ==="
-  echo "# Vector is the default and loaded automatically."
-  echo "wfLoadSkin( 'MonoBook' );"
-  echo "wfLoadSkin( 'Timeless' );"
-  echo "wfLoadSkin( 'MinervaNeue' );"
-  echo ""
-  echo "# === Extension configuration ==="
-  echo ""
-  echo "# Scribunto (Lua)"
-  echo "\$wgScribuntoDefaultEngine = 'luastandalone';"
-  echo "\$wgScribuntoEngineConf['luastandalone']['luaPath'] = '/usr/bin/lua';"
-  echo "\$wgScribuntoUseCodeEditor = true;"
-  echo ""
-  echo "# JsonConfig — data pages from Commons"
-  echo "\$wgJsonConfigEnableLuaSupport = true;"
-  echo "\$wgJsonConfigModels['Tabular.JsonConfig'] = 'JsonConfig\\\\JCTabularContent';"
-  echo "\$wgJsonConfigs['Tabular.JsonConfig'] = ["
-  echo "    'namespace' => 486,"
-  echo "    'nsName' => 'Data',"
-  echo "    'pattern' => '/.\.tab$/',"
-  echo "    'license' => 'CC0-1.0',"
-  echo "    'isLocal' => false,"
-  echo "];"
-  echo "\$wgJsonConfigModels['Map.JsonConfig'] = 'JsonConfig\\\\JCMapDataContent';"
-  echo "\$wgJsonConfigs['Map.JsonConfig'] = ["
-  echo "    'namespace' => 486,"
-  echo "    'nsName' => 'Data',"
-  echo "    'pattern' => '/.\.map$/',"
-  echo "    'license' => 'CC0-1.0',"
-  echo "    'isLocal' => false,"
-  echo "];"
-  echo "\$wgJsonConfigInterwikiPrefix = 'commons';"
-  echo "\$wgJsonConfigs['Tabular.JsonConfig']['remote'] = ["
-  echo "    'url' => 'https://commons.wikimedia.org/w/api.php'"
-  echo "];"
-  echo "\$wgJsonConfigs['Map.JsonConfig']['remote'] = ["
-  echo "    'url' => 'https://commons.wikimedia.org/w/api.php'"
-  echo "];"
-  echo ""
-  echo "# TitleBlacklist"
-  echo "\$wgGroupPermissions['sysop']['tboverride'] = false;"
-  echo "\$wgTitleBlacklistSources = ["
-  echo "  ["
-  echo "    'type' => 'localpage',"
-  echo "    'src'  => 'MediaWiki:Titleblacklist'"
-  echo "  ]"
-  echo "];"
-  echo ""
-  echo "# WikiCategoryTagCloud"
-  echo "# (no additional config needed — just loads)"
-  echo ""
-  echo "# IFrameTag"
-  echo "\$iFrameOnWikiConfig = false;"
-  echo "\$iFrameDomains = ["
-  echo "  'restreamer.asmbly.org'"
-  echo "];"
-  echo ""
-  echo "# PluggableAuth + DiscourseSsoConsumer"
-  echo "# NOTE: PluggableAuth v7.x for MW 1.39+ uses a different config format."
-  echo "# The restore script will merge the old Discourse SSO settings."
-  echo "# Uncomment and configure after verifying DiscourseSsoConsumer compatibility:"
-  echo "# \$wgPluggableAuth_EnableLocalLogin = false;"
-  echo "# \$wgPluggableAuth_ButtonLabelMessage = 'Log In With Discourse';"
-} >> "${LSETTINGS}"
-
+# NOTE: extension loading (wfLoadExtension/wfLoadSkin) and all extension
+# configuration live SOLELY in config/mediawiki/LocalSettings.php — the
+# single source of truth deployed by 04-mediawiki.sh.
 
 echo "05-extensions.sh complete"

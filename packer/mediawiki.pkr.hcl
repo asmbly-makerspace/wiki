@@ -182,8 +182,9 @@ build {
       "php --version",
       "mysqladmin --version",
       "httpd -v",
+      "/var/www/mediawiki/extensions/Scribunto/includes/Engines/LuaStandalone/binaries/lua5_1_5_linux_64_generic/lua -v",
       "php /var/www/mediawiki/maintenance/checkDependencies.php || true",
-      "systemctl is-enabled httpd mariadb crond",
+      "systemctl is-enabled httpd php-fpm mariadb crond",
     ]
     execute_command = "sudo bash '{{ .Path }}'"
   }

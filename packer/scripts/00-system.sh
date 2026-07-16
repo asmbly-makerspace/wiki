@@ -24,10 +24,26 @@ dnf install -y \
   nfs-utils \
   python3 \
   python3-pip \
-  lua \
   diffutils \
   cronie \
-  gettext
+  gettext \
+  gcc \
+  make
+
+# NOTE: no distro Lua package is installed here. Per
+# https://www.mediawiki.org/wiki/Extension:Scribunto#Lua_binary :
+#   - Scribunto's bundled LuaStandalone binaries are x86/x86-64/Mac/Windows
+#     only — no arm64 build exists.
+#   - LuaBinaries (http://luabinaries.sourceforge.net/) — the docs' own
+#     suggested source for additional binaries — likewise ships Linux
+#     binaries for x86/x86_64 only, no aarch64.
+#   - LuaJIT is explicitly "not supported" (removed for Spectre/bitrot
+#     concerns, phab:T184156) even though API/ABI-compatible.
+#   - AL2023 has no lua5.1 package (only lua 5.4).
+# The only correct option on Graviton is to compile Lua 5.1.5 from source,
+# which 04-mediawiki.sh does, installing it at Scribunto's own default
+# bundled binary path so no $wgScribuntoEngineConf luaPath override is
+# needed.
 
 # ── Enable crond for scheduled backups ────────────────────────────────────────
 systemctl enable --now crond

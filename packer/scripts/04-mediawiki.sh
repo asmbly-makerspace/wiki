@@ -57,6 +57,41 @@ mv "/var/www/mediawiki-${MW_VERSION}" "${MW_ROOT}"
 mkdir -p "${MW_ROOT}/images"
 mkdir -p "${MW_ROOT}/maintenance"
 
+# ── Compile Lua 5.1.5 for Scribunto (arm64) ──────────────────────────────────
+# Neither Scribunto's bundled binaries nor LuaBinaries (the docs' suggested
+# fallback: https://www.mediawiki.org/wiki/Extension:Scribunto#Additional_binaries)
+# ship an aarch64 build — both are x86/x86_64-only — and LuaJIT is explicitly
+# unsupported by Scribunto (Spectre/bitrot concerns, phab:T184156). AL2023
+# also has no lua5.1 package. Compiling from source is the documented
+# fallback ("or from your Linux distribution") when no binary is available.
+#
+# This script runs natively on the arm64 Packer builder, so a plain 'make
+# generic' build (the same target used for Scribunto's own bundled x86
+# binaries) produces a correct native binary with no cross-compilation.
+# Installing it at Scribunto's own default bundled path means no
+# $wgScribuntoEngineConf luaPath override is required — matches the "should
+# work out of the box" behavior the docs describe for supported platforms.
+LUA_BUILD_DIR="/tmp/lua-5.1.5"
+SCRIBUNTO_LUA_BIN="${MW_ROOT}/extensions/Scribunto/includes/Engines/LuaStandalone/binaries/lua5_1_5_linux_64_generic/lua"
+
+[ -d "$(dirname "${SCRIBUNTO_LUA_BIN}")" ] || {
+  echo "ERROR: Scribunto LuaStandalone binaries dir not found — is Scribunto bundled in this MW tarball?"
+  exit 1
+}
+
+echo "Compiling Lua 5.1.5 (generic) natively for arm64…"
+cd /tmp
+curl -fsSL -o lua-5.1.5.tar.gz https://www.lua.org/ftp/lua-5.1.5.tar.gz
+rm -rf "${LUA_BUILD_DIR}"
+tar -xzf lua-5.1.5.tar.gz -C /tmp
+make -C "${LUA_BUILD_DIR}" generic
+
+install -m 755 -o root -g root "${LUA_BUILD_DIR}/src/lua" "${SCRIBUNTO_LUA_BIN}"
+"${SCRIBUNTO_LUA_BIN}" -v
+
+rm -rf "${LUA_BUILD_DIR}" /tmp/lua-5.1.5.tar.gz
+echo "Lua 5.1.5 (arm64) installed at ${SCRIBUNTO_LUA_BIN}"
+
 # ── Directory permissions ─────────────────────────────────────────────────────
 chown -R apache:apache "${MW_ROOT}"
 # images/ must be writable by Apache

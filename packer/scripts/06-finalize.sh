@@ -11,8 +11,8 @@ for svc in postfix; do
   systemctl disable "${svc}" 2>/dev/null && systemctl stop "${svc}" 2>/dev/null || true
 done
 
-# Ensure only httpd and mariadb are enabled at boot
-systemctl enable httpd mariadb crond
+# Ensure only httpd, php-fpm, and mariadb are enabled at boot
+systemctl enable httpd php-fpm mariadb crond
 
 # ── MediaWiki file permissions (final pass) ───────────────────────────────────
 # Core files: root-owned, apache-readable
