@@ -5,7 +5,7 @@
 # Run once after the instance has its final IP/DNS and port 80/443 are
 # reachable from the internet:
 #
-#   sudo bash /opt/mediawiki-ami/setup/setup-ssl.sh
+#   sudo bash /opt/mediawiki-ami/setup-ssl.sh
 #
 # After this script completes:
 #   - Apache serves the wiki over HTTPS with a valid cert

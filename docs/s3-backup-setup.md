@@ -153,7 +153,7 @@ aws s3 cp "s3://${BACKUP_BUCKET}/backups/daily/manifest.txt" - --region "${AWS_R
 
 ```bash
 sudo BACKUP_BUCKET=my-mediawiki-backups \
-  bash /opt/mediawiki-ami/backup/backup-with-retention.sh
+  bash /opt/mediawiki-ami/backup-with-retention.sh
 ```
 
 ### Verify lifecycle rules are expiring objects
@@ -177,17 +177,17 @@ For the initial migration from 1.35, also run `scripts/restore/upgrade-1.35-to-1
 ```bash
 # Restore from latest daily backup
 sudo BACKUP_BUCKET=my-mediawiki-backups \
-  bash /opt/mediawiki-ami/restore/restore.sh
+  bash /opt/mediawiki-ami/restore.sh
 
 # Restore from a specific weekly backup
 sudo BACKUP_BUCKET=my-mediawiki-backups \
   BACKUP_TIMESTAMP=weekly/2026-W24 \
-  bash /opt/mediawiki-ami/restore/restore.sh
+  bash /opt/mediawiki-ami/restore.sh
 
 # Restore from a specific monthly backup
 sudo BACKUP_BUCKET=my-mediawiki-backups \
   BACKUP_TIMESTAMP=monthly/2026-05 \
-  bash /opt/mediawiki-ami/restore/restore.sh
+  bash /opt/mediawiki-ami/restore.sh
 ```
 
 ---

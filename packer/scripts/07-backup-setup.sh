@@ -3,7 +3,7 @@
 # Phase 7: Install automated backup cron with GFS (Grandfather-Father-Son) retention.
 #
 # This script installs:
-#   - The backup-with-retention.sh script at /opt/mediawiki-ami/backup/
+#   - The backup-with-retention.sh script at /opt/mediawiki-ami/
 #   - A cron job that runs nightly at 02:00 UTC
 #   - Log rotation for backup logs
 #
