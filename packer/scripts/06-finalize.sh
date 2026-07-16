@@ -11,7 +11,8 @@ for svc in postfix; do
   systemctl disable "${svc}" 2>/dev/null && systemctl stop "${svc}" 2>/dev/null || true
 done
 
-# Ensure only httpd, php-fpm, and mariadb are enabled at boot
+# Ensure httpd, php-fpm, mariadb, and crond are enabled at boot
+# (amazon-cloudwatch-agent is enabled separately, below, once its config is staged)
 systemctl enable httpd php-fpm mariadb crond
 
 # ── MediaWiki file permissions (final pass) ───────────────────────────────────
@@ -37,12 +38,20 @@ chown root:apache "${MW_ROOT}/LocalSettings.php"
 cp /tmp/config/cron/mediawiki-jobs /etc/cron.d/mediawiki-jobs
 chmod 644 /etc/cron.d/mediawiki-jobs
 
-# ── CloudWatch Agent stub config ──────────────────────────────────────────────
-# Install the CloudWatch agent so operators can enable it post-launch
-dnf install -y amazon-cloudwatch-agent || true
+# ── CloudWatch Agent — installed, configured, and enabled at boot ────────────
+# Requires the instance's IAM role to include CloudWatchAgentServerPolicy
+# (see docs/s3-backup-setup.md Step 5). Without it the agent starts but
+# fails to publish metrics/logs — check /var/log/amazon-cloudwatch-agent.log.
+dnf install -y amazon-cloudwatch-agent
 
 mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/
 cp /tmp/config/cloudwatch/mediawiki-cwa.json /opt/aws/amazon-cloudwatch-agent/etc/mediawiki-cwa.json
+
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config -m ec2 -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/mediawiki-cwa.json
+
+systemctl enable amazon-cloudwatch-agent
 
 # ── Install scripts on the AMI ────────────────────────────────────────────────
 mkdir -p /opt/mediawiki-ami

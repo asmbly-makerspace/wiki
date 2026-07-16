@@ -88,7 +88,11 @@ You can also trigger it manually from the Actions UI with an optional dry-run.
 ## Step 4 — Launch the new instance
 
 1. Launch an EC2 instance from the new AMI (t4g.medium, us-east-2, same VPC as old server)
-2. Attach an IAM instance profile with `s3:GetObject` + `s3:ListBucket` on `$BACKUP_BUCKET`
+2. Attach an IAM instance profile with `s3:GetObject` + `s3:ListBucket` on `$BACKUP_BUCKET`,
+   plus the AWS-managed `CloudWatchAgentServerPolicy` (see
+   [docs/s3-backup-setup.md](docs/s3-backup-setup.md#step-5--iam-policy-for-the-ec2-instance-profile)) —
+   the CloudWatch agent is already installed, configured, and enabled at boot by the AMI;
+   it just needs permission to publish.
 3. Attach the same Elastic IP / security groups as the old server (but do **not** move the EIP yet)
 
 ---
@@ -128,6 +132,10 @@ cat /tmp/mw-update-*.txt
 # Verify backup cron is installed
 sudo cat /etc/cron.d/mediawiki-backup
 sudo cat /etc/sysconfig/mediawiki-backup   # confirm BACKUP_BUCKET is set
+
+# Verify CloudWatch agent is running and publishing (no AccessDenied errors)
+sudo systemctl status amazon-cloudwatch-agent
+sudo tail -50 /var/log/amazon-cloudwatch-agent.log
 ```
 
 When satisfied:
@@ -170,7 +178,7 @@ via `/etc/cron.d/mediawiki-backup`. It uploads to S3 with GFS rotation:
 
 ```
 config/
-  cloudwatch/mediawiki-cwa.json   ← CloudWatch agent config
+  cloudwatch/mediawiki-cwa.json   ← CloudWatch agent config (metrics + logs, installed & enabled at boot)
   cron/mediawiki-backup           ← Cron job definitions
   cron/mediawiki-jobs             ← MediaWiki job runner cron
   httpd/mediawiki.conf            ← Apache vhost template

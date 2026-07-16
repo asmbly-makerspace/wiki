@@ -90,8 +90,18 @@ aws s3api get-bucket-lifecycle-configuration --bucket "${BACKUP_BUCKET}"
 
 ## Step 5 — IAM policy for the EC2 instance profile
 
-The instance needs permission to read and write within the backup prefix.
-Attach the following inline policy to the instance's IAM role:
+The instance needs permission to read and write within the backup prefix, and
+to publish metrics/logs to CloudWatch (the agent is installed and enabled by
+`06-finalize.sh`, but will silently fail to publish without this permission).
+
+Attach the AWS-managed **`CloudWatchAgentServerPolicy`** plus the following
+inline policy to the instance's IAM role:
+
+```bash
+aws iam attach-role-policy \
+  --role-name <instance-role-name> \
+  --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+```
 
 ```json
 {
@@ -113,6 +123,18 @@ Attach the following inline policy to the instance's IAM role:
   ]
 }
 ```
+
+### Verify the agent is running and publishing
+
+```bash
+sudo systemctl status amazon-cloudwatch-agent
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a status
+sudo tail -50 /var/log/amazon-cloudwatch-agent.log
+```
+
+If the role is missing `CloudWatchAgentServerPolicy`, the log shows
+`AccessDenied`/`UnauthorizedOperation` errors even though the service is
+`active (running)`.
 
 ---
 
