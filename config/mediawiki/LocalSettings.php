@@ -106,6 +106,7 @@ $wgEnableUploads   = true;
 $wgUploadPath      = "$wgScriptPath/images";
 $wgUploadDirectory = "$IP/images";
 $wgMaxUploadSize   = 104857600;   # 100 MiB
+$wgMaxImageArea    = 6.4e7;
 
 # Same additional types as 1.35 server
 $wgFileExtensions = array_merge(
