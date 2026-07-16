@@ -190,11 +190,11 @@ fi
 
 # ── Step 5: Fix permissions ───────────────────────────────────────────────────
 log "--- Step 5: Fixing permissions ---"
-chown -R apache:apache "${MW_ROOT}/images" 2>/dev/null || \
-  chown -R www-data:www-data "${MW_ROOT}/images" 2>/dev/null || true
-chmod -R 755 "${MW_ROOT}/images" 2>/dev/null || true
+chown -R apache:apache "${MW_ROOT}/images" 2>/dev/null
+find "${MW_ROOT}/images" -type d -exec chmod 755 {} \;
+find "${MW_ROOT}/images" -type f -exec chmod 644 {} \;
 chmod 640 "${MW_ROOT}/LocalSettings.php"
-chown root:apache "${MW_ROOT}/LocalSettings.php" 2>/dev/null || true
+chown root:apache "${MW_ROOT}/LocalSettings.php" 2>/dev/null
 
 log "=== Restore complete ==="
 log "  DB:     ${MW_DB_NAME} on ${MW_DB_HOST}"
