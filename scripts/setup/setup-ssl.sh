@@ -23,6 +23,12 @@ EMAIL="${EMAIL:-admin@asmbly.org}"
 
 log() { echo "[$(date -u +"%Y-%m-%d %H:%M:%S")] $*"; }
 
+log "Setting system hostname to ${DOMAIN}..."
+hostnamectl set-hostname "${DOMAIN}"
+if ! grep -q "127.0.0.1 ${DOMAIN}" /etc/hosts; then
+  echo "127.0.0.1 ${DOMAIN}" >> /etc/hosts
+fi
+
 log "Obtaining Let's Encrypt certificate for ${DOMAIN}..."
 certbot --apache \
   --non-interactive \
@@ -50,4 +56,3 @@ systemctl enable --now certbot-renew.timer
 log "Auto-renewal enabled (renews 30 days before expiry — at the 60-day mark)"
 log "Timer status: $(systemctl is-enabled certbot-renew.timer)"
 log "Next run:     $(systemctl list-timers certbot-renew.timer --no-pager 2>/dev/null | awk 'NR==2{print $1,$2}')"
-
