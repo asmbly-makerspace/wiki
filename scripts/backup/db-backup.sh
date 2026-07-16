@@ -10,7 +10,7 @@
 #   MW_ROOT, MW_DB_NAME, MW_DB_USER, MW_DB_PASS, MW_DB_HOST, AWS_REGION
 #
 # Cron example (nightly at 02:00 UTC):
-#   0 2 * * * root BACKUP_BUCKET=my-bucket bash /opt/mediawiki-ami/scripts/backup/db-backup.sh >> /var/log/mw-db-backup.log 2>&1
+#   0 2 * * * root BACKUP_BUCKET=my-bucket bash /opt/mediawiki-ami/db-backup.sh >> /var/log/mw-db-backup.log 2>&1
 
 set -euo pipefail
 

@@ -304,7 +304,7 @@ make-backup)
   podman exec -it "${CONTAINER_NAME}" \
     bash -c 'mkdir -p /tmp/mock-s3 &&
       export MOCK_S3_ROOT=/tmp/mock-s3 BACKUP_BUCKET=mock-bucket AWS_REGION=us-east-2 &&
-      bash /opt/mediawiki-ami/backup/full-backup.sh'
+      bash /opt/mediawiki-ami/full-backup.sh'
 
   echo "==> Copying backup out of container → ${LOCAL_BACKUP_DIR}…"
   # Clear previous test backup so old artefacts don't confuse restore tests
@@ -376,7 +376,7 @@ test-restore)
   TIMESTAMP_EXPORT=""
   [[ -n "${BACKUP_TAG}" ]] && TIMESTAMP_EXPORT="export BACKUP_TIMESTAMP=${BACKUP_TAG} &&"
   podman exec -it "${CONTAINER_NAME}" \
-    bash -c "export MOCK_S3_ROOT=/tmp/mock-s3 BACKUP_BUCKET=mock-bucket AWS_REGION=us-east-2 && ${TIMESTAMP_EXPORT} bash /opt/mediawiki-ami/restore/restore.sh"
+    bash -c "export MOCK_S3_ROOT=/tmp/mock-s3 BACKUP_BUCKET=mock-bucket AWS_REGION=us-east-2 && ${TIMESTAMP_EXPORT} bash /opt/mediawiki-ami/restore.sh"
   ;;
 
 # ── test-upgrade ──────────────────────────────────────────────────────────────
@@ -386,7 +386,7 @@ test-upgrade)
   require_container
   echo "==> Running upgrade-1.35-to-1.43.sh inside '${CONTAINER_NAME}'…"
   podman exec -it "${CONTAINER_NAME}" \
-    bash /opt/mediawiki-ami/restore/upgrade-1.35-to-1.43.sh
+    bash /opt/mediawiki-ami/upgrade-1.35-to-1.43.sh
   ;;
 
 *)

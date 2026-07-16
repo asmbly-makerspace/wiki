@@ -15,10 +15,10 @@
 #   Or set environment variables directly.
 #
 # Cron usage (already installed by 07-backup-setup.sh):
-#   0 2 * * * root /opt/mediawiki-ami/backup/backup-with-retention.sh >> /var/log/mediawiki-backup.log 2>&1
+#   0 2 * * * root /opt/mediawiki-ami/backup-with-retention.sh >> /var/log/mediawiki-backup.log 2>&1
 #
 # Manual usage:
-#   sudo bash /opt/mediawiki-ami/backup/backup-with-retention.sh
+#   sudo bash /opt/mediawiki-ami/backup-with-retention.sh
 
 set -euo pipefail
 
@@ -194,4 +194,4 @@ log "  Daily:   s3://${BACKUP_BUCKET}/backups/daily/"
 [ "${DOW}" = "7" ]  && log "  Weekly:  s3://${BACKUP_BUCKET}/backups/weekly/${WEEK_NUM}/"
 [ "${DOM}" = "01" ] && log "  Monthly: s3://${BACKUP_BUCKET}/backups/monthly/${MONTH_TAG}/"
 log "  Retention is managed by S3 Lifecycle Rules — see docs/s3-backup-setup.md"
-log "  To restore: sudo BACKUP_BUCKET=${BACKUP_BUCKET} bash /opt/mediawiki-ami/restore/restore.sh"
+log "  To restore: sudo BACKUP_BUCKET=${BACKUP_BUCKET} bash /opt/mediawiki-ami/restore.sh"

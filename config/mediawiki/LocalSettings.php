@@ -106,6 +106,7 @@ $wgEnableUploads   = true;
 $wgUploadPath      = "$wgScriptPath/images";
 $wgUploadDirectory = "$IP/images";
 $wgMaxUploadSize   = 104857600;   # 100 MiB
+$wgMaxImageArea    = 6.4e7;
 
 # Same additional types as 1.35 server
 $wgFileExtensions = array_merge(
@@ -163,6 +164,7 @@ $wgUseInstantCommons = true;
 wfLoadSkin( 'Vector' );
 wfLoadSkin( 'Timeless' );
 wfLoadSkin( 'MonoBook' );
+wfLoadSkin( 'MinervaNeue' );
 $wgDefaultSkin = "timeless";
 
 # =============================================================================
@@ -192,15 +194,21 @@ $wgGroupPermissions['sysop']['tboverride'] = false;
 # Bundled extensions (shipped with MW 1.43 tarball)
 # =============================================================================
 
+wfLoadExtension( 'AbuseFilter' );
 wfLoadExtension( 'CategoryTree' );
 wfLoadExtension( 'Cite' );
 wfLoadExtension( 'CiteThisPage' );
 wfLoadExtension( 'CodeEditor' );
 wfLoadExtension( 'ConfirmEdit' );
+wfLoadExtension( 'DiscussionTools' );
+wfLoadExtension( 'Echo' );
 wfLoadExtension( 'Gadgets' );
 wfLoadExtension( 'ImageMap' );
 wfLoadExtension( 'InputBox' );
 wfLoadExtension( 'Interwiki' );
+wfLoadExtension( 'Linter' );
+wfLoadExtension( 'LoginNotify' );
+wfLoadExtension( 'Math' );
 wfLoadExtension( 'MultimediaViewer' );
 wfLoadExtension( 'Nuke' );
 wfLoadExtension( 'OATHAuth' );
@@ -214,18 +222,34 @@ wfLoadExtension( 'SpamBlacklist' );
 wfLoadExtension( 'SyntaxHighlight_GeSHi' );
 wfLoadExtension( 'TemplateData' );
 wfLoadExtension( 'TextExtracts' );
+wfLoadExtension( 'Thanks' );
 wfLoadExtension( 'TitleBlacklist' );
 wfLoadExtension( 'VisualEditor' );
 wfLoadExtension( 'WikiEditor' );
 
-# =============================================================================
-# Separately installed extensions (Gerrit REL1_43)
-# =============================================================================
+# AbuseFilter — rule-based anti-spam/vandalism filters
+$wgAbuseFilterActions = [
+    'throttle' => true,
+    'warn' => true,
+    'disallow' => true,
+    'blockautopromote' => true,
+    'block' => true,
+    'tag' => true,
+];
+
+# LoginNotify — notifies users of logins from new devices/locations
+$wgLoginNotifyUseEcho = true;
+
+# Math — LaTeX formula rendering (useful for electronics/physics pages)
+$wgDefaultUserOptions['math'] = 'mathml';
 
 # Lua scripting — required by Infobox, Navbox, and excerpt templates
 wfLoadExtension( 'Scribunto' );
 $wgScribuntoDefaultEngine = 'luastandalone';
-$wgScribuntoEngineConf['luastandalone']['luaPath'] = '/usr/bin/lua';
+# NOTE: no luaPath override. Neither Scribunto's bundled binaries, LuaBinaries,
+# nor LuaJIT (unsupported — phab:T184156) are available for arm64/Graviton.
+# 04-mediawiki.sh compiles Lua 5.1.5 from source and installs it at
+# Scribunto's own default bundled-binary path, so auto-detection just works.
 $wgScribuntoUseCodeEditor = true;
 
 # Per-template CSS — used by common Scribunto modules

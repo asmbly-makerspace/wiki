@@ -4,5 +4,5 @@
 # Edit /etc/sysconfig/mediawiki-backup to configure bucket and retention
 SHELL=/bin/bash
 
-0 8 * * * root /opt/mediawiki-ami/backup/backup-with-retention.sh >> /var/log/mediawiki-backup.log 2>&1
+0 8 * * * root /opt/mediawiki-ami/backup-with-retention.sh >> /var/log/mediawiki-backup.log 2>&1
 
