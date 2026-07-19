@@ -45,10 +45,26 @@ jobs:
         working-directory: packer
         run: packer init .
 
+      - name: Resolve source AMI
+        id: ami
+        working-directory: packer
+        run: |
+          AMI_ID=$(aws ec2 describe-images --owners amazon \
+            --filters "Name=name,Values=al2023-ami-2023.*-kernel-*-arm64" \
+                      "Name=root-device-type,Values=ebs" \
+                      "Name=virtualization-type,Values=hvm" \
+                      "Name=architecture,Values=arm64" \
+                      "Name=state,Values=available" \
+            --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text \
+            --region "${{ vars.AWS_REGION }}")
+          echo "ami_id=${AMI_ID}" >> "$GITHUB_OUTPUT"
+          echo "Resolved source AMI: ${AMI_ID}"
+
       - name: Packer Validate
         working-directory: packer
         env:
           PKR_VAR_aws_region:          ${{ vars.AWS_REGION }}
+          PKR_VAR_source_ami:          ${{ steps.ami.outputs.ami_id }}
           PKR_VAR_vpc_id:              ${{ secrets.PACKER_VPC_ID }}
           PKR_VAR_subnet_id:           ${{ secrets.PACKER_SUBNET_ID }}
           PKR_VAR_mw_db_password:      ${{ secrets.MW_DB_PASSWORD }}
@@ -93,6 +109,21 @@ jobs:
         working-directory: packer
         run: packer init .
 
+      - name: Resolve source AMI
+        id: ami
+        working-directory: packer
+        run: |
+          AMI_ID=$(aws ec2 describe-images --owners amazon \
+            --filters "Name=name,Values=al2023-ami-2023.*-kernel-*-arm64" \
+                      "Name=root-device-type,Values=ebs" \
+                      "Name=virtualization-type,Values=hvm" \
+                      "Name=architecture,Values=arm64" \
+                      "Name=state,Values=available" \
+            --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text \
+            --region "${{ vars.AWS_REGION }}")
+          echo "ami_id=${AMI_ID}" >> "$GITHUB_OUTPUT"
+          echo "Resolved source AMI: ${AMI_ID}"
+
       - name: Determine MediaWiki version
         id: version
         run: |
@@ -110,6 +141,7 @@ jobs:
         working-directory: packer
         env:
           PKR_VAR_aws_region:          ${{ vars.AWS_REGION }}
+          PKR_VAR_source_ami:          ${{ steps.ami.outputs.ami_id }}
           PKR_VAR_vpc_id:              ${{ secrets.PACKER_VPC_ID }}
           PKR_VAR_subnet_id:           ${{ secrets.PACKER_SUBNET_ID }}
           PKR_VAR_mw_db_password:      ${{ secrets.MW_DB_PASSWORD }}
@@ -128,6 +160,7 @@ jobs:
           packer build \
             -color=false \
             -timestamp-ui \
+            -only='*.amazon-ebs.mediawiki' \
             -var "mediawiki_version=${{ steps.version.outputs.mw_version }}" \
             . | tee /tmp/packer-build.log
 

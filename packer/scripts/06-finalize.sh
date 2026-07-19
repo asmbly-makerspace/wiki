@@ -42,16 +42,25 @@ chmod 644 /etc/cron.d/mediawiki-jobs
 # Requires the instance's IAM role to include CloudWatchAgentServerPolicy
 # (see docs/s3-backup-setup.md Step 5). Without it the agent starts but
 # fails to publish metrics/logs — check /var/log/amazon-cloudwatch-agent.log.
-dnf install -y amazon-cloudwatch-agent
+#
+# Skipped in the local docker.mediawiki test build (packer-test/Dockerfile.test
+# sets MEDIAWIKI_AMI_LOCAL_TEST=1): the RPM's %posttrans scriptlet and
+# `amazon-cloudwatch-agent-ctl` both require a real systemd/dbus init system
+# and EC2 IMDS, none of which exist in a plain container.
+if [[ -z "${MEDIAWIKI_AMI_LOCAL_TEST:-}" ]]; then
+  dnf install -y amazon-cloudwatch-agent
 
-mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/
-cp /tmp/config/cloudwatch/mediawiki-cwa.json /opt/aws/amazon-cloudwatch-agent/etc/mediawiki-cwa.json
+  mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/
+  cp /tmp/config/cloudwatch/mediawiki-cwa.json /opt/aws/amazon-cloudwatch-agent/etc/mediawiki-cwa.json
 
-/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
-  -a fetch-config -m ec2 -s \
-  -c file:/opt/aws/amazon-cloudwatch-agent/etc/mediawiki-cwa.json
+  /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+    -a fetch-config -m ec2 -s \
+    -c file:/opt/aws/amazon-cloudwatch-agent/etc/mediawiki-cwa.json
 
-systemctl enable amazon-cloudwatch-agent
+  systemctl enable amazon-cloudwatch-agent
+else
+  echo "Skipping CloudWatch Agent install — local docker test build (MEDIAWIKI_AMI_LOCAL_TEST set)"
+fi
 
 # ── Install scripts on the AMI ────────────────────────────────────────────────
 mkdir -p /opt/mediawiki-ami
