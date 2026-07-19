@@ -5,23 +5,21 @@ packer {
       version = ">= 1.3.0"
       source  = "github.com/hashicorp/amazon"
     }
+    docker = {
+      version = ">= 1.0.8"
+      source  = "github.com/hashicorp/docker"
+    }
   }
 }
 
 # ── Source AMI lookup ─────────────────────────────────────────────────────────
-data "amazon-ami" "amazon_linux_2023" {
-  region = var.aws_region
-  filters = {
-    name                = "al2023-ami-2023.*-kernel-*-arm64"
-    root-device-type    = "ebs"
-    virtualization-type = "hvm"
-    architecture        = "arm64"
-    state               = "available"
-  }
-  owners      = ["amazon"]
-  most_recent = true
-}
-
+# NOTE: intentionally NOT a `data "amazon-ami"` block. Packer evaluates every
+# `data` source on every `packer build`/`validate` invocation regardless of
+# `-only`/`-except` (they aren't filtered like `source`/`build` blocks are),
+# which would require AWS credentials even for the credential-free
+# docker.mediawiki local build. Resolve the AMI ID out-of-band instead — see
+# README "Production AMI build" for the `aws ec2 describe-images` command —
+# and pass it via var.source_ami.
 locals {
   timestamp = formatdate("YYYYMMDDhhmmss", timestamp())
   ami_name  = "${var.ami_name_prefix}-${var.mediawiki_version}-${local.timestamp}"
@@ -39,7 +37,7 @@ locals {
 # ── Builder ───────────────────────────────────────────────────────────────────
 source "amazon-ebs" "mediawiki" {
   region        = var.aws_region
-  source_ami    = data.amazon-ami.amazon_linux_2023.id
+  source_ami    = var.source_ami
   instance_type = var.instance_type
   ssh_username  = "ec2-user"
 
@@ -68,10 +66,29 @@ source "amazon-ebs" "mediawiki" {
   temporary_security_group_source_public_ip = true
 }
 
+# ── Local test builder ────────────────────────────────────────────────────────
+# Reuses the same provisioners as amazon-ebs.mediawiki for fast, free local
+# iteration. Build the base image first:
+#   packer-test/test-local.sh build
+# Then: packer build -only='*.docker.mediawiki' packer/
+source "docker" "mediawiki" {
+  image  = var.docker_base_image
+  commit = true
+  # Never attempt a registry pull — the image is built locally (see
+  # packer-test/test-local.sh build) and never published.
+  pull = false
+  run_command = [
+    "-d", "-i", "-t",
+    "--cap-add", "SYS_ADMIN",
+    "--entrypoint", "/bin/sh",
+    "{{.Image}}", "-c", "sleep infinity",
+  ]
+}
+
 # ── Build ─────────────────────────────────────────────────────────────────────
 build {
   name    = "mediawiki-ami"
-  sources = ["source.amazon-ebs.mediawiki"]
+  sources = ["source.amazon-ebs.mediawiki", "source.docker.mediawiki"]
 
   # ── Upload config + scripts ───────────────────────────────────────────────
   # File provisioners run first.
@@ -160,8 +177,12 @@ build {
 
   # ── Finalize / harden ─────────────────────────────────────────────────────
   provisioner "shell" {
-    script          = "${path.root}/scripts/06-finalize.sh"
-    execute_command = "sudo bash '{{ .Path }}'"
+    script = "${path.root}/scripts/06-finalize.sh"
+    # -E preserves the environment (specifically MEDIAWIKI_AMI_LOCAL_TEST, set
+    # by packer-test/Dockerfile.test) — plain `sudo` resets it via env_reset,
+    # even for root->root, which would otherwise always run the CloudWatch
+    # Agent install/enable that requires a real systemd/dbus init system.
+    execute_command = "sudo -E bash '{{ .Path }}'"
     timeout         = "10m"
   }
 
@@ -176,8 +197,9 @@ build {
     timeout = "5m"
   }
 
-  # ── Post-install checks ───────────────────────────────────────────────────
+  # ── Post-install checks (AMI) ─────────────────────────────────────────────
   provisioner "shell" {
+    only = ["amazon-ebs.mediawiki"]
     inline = [
       "php --version",
       "mysqladmin --version",
@@ -187,6 +209,29 @@ build {
       "systemctl is-enabled httpd php-fpm mariadb crond amazon-cloudwatch-agent",
     ]
     execute_command = "sudo bash '{{ .Path }}'"
+  }
+
+  # ── Post-install checks (docker) ──────────────────────────────────────────
+  # Same core checks, minus AMI-only services (06-finalize.sh is skipped, so
+  # amazon-cloudwatch-agent is never installed for this source).
+  provisioner "shell" {
+    only = ["docker.mediawiki"]
+    inline = [
+      "php --version",
+      "mysqladmin --version",
+      "httpd -v",
+      "/var/www/mediawiki/extensions/Scribunto/includes/Engines/LuaStandalone/binaries/lua5_1_5_linux_64_generic/lua -v",
+      "php /var/www/mediawiki/maintenance/checkDependencies.php || true",
+      "systemctl is-enabled httpd php-fpm mariadb crond",
+    ]
+    execute_command = "sudo bash '{{ .Path }}'"
+  }
+
+  # ── Tag the local test image (docker source only) ─────────────────────────
+  post-processor "docker-tag" {
+    only       = ["docker.mediawiki"]
+    repository = "mediawiki-local"
+    tags       = ["latest"]
   }
 
   # ── Record the AMI metadata ───────────────────────────────────────────────

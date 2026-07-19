@@ -51,26 +51,34 @@ See [docs/s3-backup-setup.md](docs/s3-backup-setup.md) for the full setup includ
 
 ## Step 3 — Build the new AMI
 
-### 3a. Local build
+### 3a. Local Docker build (recommended — no AWS resources needed)
+
+Fastest way to test script/config changes end-to-end. The `docker.mediawiki`
+Packer source runs the exact same provisioners as the real AMI build, on top
+of an Amazon Linux 2023 container (see [packer-test/](packer-test/)).
+
+Requires a `docker` CLI on `PATH` — Packer's docker plugin shells out to it
+directly.
 
 ```bash
-cp packer/variables.pkrvars.hcl.example packer/my.auto.pkrvars.hcl
-# Edit my.auto.pkrvars.hcl — set aws_region, vpc_id, subnet_id, backup_bucket
+packer-test/test-local.sh build      # build the base container image (once)
 
-# Export secrets (never put these in the .pkrvars.hcl file)
-export PKR_VAR_mw_db_password="<generated above>"
-export PKR_VAR_mw_secret_key="<generated above>"
-export PKR_VAR_mw_upgrade_key="<generated above>"
-export PKR_VAR_mw_smtp_password="<rotated Gmail app password>"
-export PKR_VAR_mw_discourse_secret="<rotated Discourse SSO secret>"
+cp packer-test/test.pkrvars.hcl.example packer-test/test.pkrvars.hcl
+# Edit test.pkrvars.hcl — dummy values are fine unless you need to verify
+# the generated LocalSettings.php against real secrets, but github_token
+# must be a real PAT (read:contents) — Composer needs it to fetch extensions
+
+mkdir -p output   # manifest post-processor writes here; not created automatically
 
 cd packer
 packer init .
-packer validate -var-file=my.auto.pkrvars.hcl .
-packer build   -var-file=my.auto.pkrvars.hcl .
+packer build -only='*.docker.mediawiki' -var-file=../packer-test/test.pkrvars.hcl .
 ```
 
-The resulting AMI ID is written to `output/packer-manifest.json`.
+The result is a provisioned image tagged `mediawiki-local:latest`. Use
+`packer-test/test-local.sh start` / `shell` / `stop` to run it, and
+`make-backup` / `test-restore` / `test-upgrade` to exercise the backup and
+upgrade scripts against a mocked S3 — see the script's header for details.
 
 ### 3b. Build via GitHub Actions
 
@@ -318,8 +326,9 @@ Issues and pull requests are welcome.
 - **Adding/updating a MediaWiki extension** — see
   [MediaWiki extensions](#mediawiki-extensions) above.
 - **Changing build scripts** (`packer/scripts/*.sh`) — validate locally with
-  `packer-test/test-local.sh` before opening a PR; it runs the scripts in a
-  container against `mock-aws` without needing real AWS credentials.
+  the [local Docker build](#3a-local-docker-build-recommended--no-aws-resources-needed)
+  before opening a PR; it runs the real Packer provisioners in a container
+  against `mock-aws`, without needing real AWS credentials.
 - **Changing the Packer template** — run
   `packer validate -var-file=my.auto.pkrvars.hcl packer/` and, where
   feasible, a full `packer build` against a scratch VPC.

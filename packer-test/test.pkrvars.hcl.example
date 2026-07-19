@@ -1,0 +1,21 @@
+# packer-test/test.pkrvars.hcl.example
+# Copy to packer-test/test.pkrvars.hcl (git-ignored) and use for local
+# docker.mediawiki builds — no AWS credentials required:
+#
+#   packer init packer/
+#   packer build -only='*.docker.mediawiki' -var-file=packer-test/test.pkrvars.hcl packer/
+#
+# Dummy values are fine for testing script logic (download, extract, envsubst).
+
+mw_db_password       = "test-db-password"
+mw_secret_key        = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+mw_upgrade_key       = "aaaaaaaaaaaaaaaa"
+mw_smtp_password     = "test-smtp-password"
+mw_discourse_secret  = "test-discourse-secret"
+backup_bucket        = "test-backup-bucket"
+
+# GitHub PAT — needs read:contents (public repos) or repo scope (private
+# repos), used by 05-extensions.sh. Generate at: https://github.com/settings/tokens
+github_token = "ghp_yourTokenHere"
+
+

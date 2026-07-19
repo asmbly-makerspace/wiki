@@ -2,11 +2,17 @@
 # Local test image for iterating on provisioning scripts without provisioning an
 # AWS instance.  Build once (cached); subsequent test runs reuse the image.
 #
-#   podman build -t mediawiki-packer-test -f packer/Dockerfile.test packer/
+#   podman build -t mediawiki-packer-test -f packer-test/Dockerfile.test packer-test/
 #   -- or --
-#   make test-build
+#   packer-test/test-local.sh build
 
 FROM amazonlinux:2023
+
+# Signals to provisioner scripts (see packer/scripts/06-finalize.sh) that
+# they're running in the local docker.mediawiki test build, not a real EC2
+# AMI build — used to skip steps that require systemd/dbus/IMDS, e.g. the
+# CloudWatch Agent RPM's %posttrans scriptlet fails without a real init system.
+ENV MEDIAWIKI_AMI_LOCAL_TEST=1
 
 # ── Full system update + all packages used by the provisioning scripts ────────
 # This mirrors 00-system.sh and 01-php.sh so individual phase runs don't need
@@ -25,8 +31,10 @@ RUN dnf update -y --skip-broken && \
       php8.3-pecl-apcu \
       # 03-httpd.sh deps
       httpd mod_ssl \
-      # misc
-      shadow-utils procps \
+      # misc — sudo is required because the shared Packer provisioners use
+      # `sudo bash '{{ .Path }}'`; the docker communicator connects as root,
+      # so sudo just re-execs as root with no password prompt.
+      shadow-utils procps sudo \
     && dnf clean all
 
 # ── Directories present on a full EC2 AMI but absent in the minimal image ────
