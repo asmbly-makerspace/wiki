@@ -191,7 +191,10 @@ config/
   cron/mediawiki-jobs             ← MediaWiki job runner cron
   httpd/mediawiki.conf            ← Apache vhost template
   httpd/security.conf             ← Apache security headers
-  logrotate/httpd-mediawiki       ← Log rotation for Apache
+  logrotate/httpd-mediawiki       ← Daily rotation for /var/log/mediawiki/error.log
+  logrotate/mediawiki-access      ← Hourly rotation for /var/log/mediawiki/access.log
+  logrotate/php-fpm-mediawiki     ← Daily rotation for php-fpm's error/www/slow logs
+  logrotate/mariadb                ← Daily rotation for MariaDB's error/slow-query logs
   logrotate/mediawiki-backup      ← Log rotation for backups
   mariadb/mariadb.repo            ← MariaDB 10.11 yum repo
   mariadb/mediawiki.cnf           ← MariaDB tuning
@@ -200,6 +203,7 @@ config/
   mediawiki/robots.txt            ← robots.txt for the wiki
   mediawiki/assets/               ← Static assets copied to DocumentRoot (logos, favicons)
   php/mediawiki.ini               ← PHP tuning
+  php/www-mediawiki.conf          ← php-fpm pool overrides (timeouts, logging — see 01-php.sh)
   system/limits.conf              ← OS limits
   system/mediawiki-backup.sysconfig ← /etc/sysconfig for backup cron
   system/sysctl.conf              ← Kernel tuning

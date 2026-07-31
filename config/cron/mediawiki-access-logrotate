@@ -1,0 +1,8 @@
+# mediawiki-access-logrotate — cron.d job to rotate the Apache access log hourly
+# Uploaded to /tmp/ by Packer; installed by 03-httpd.sh.
+# Uses a dedicated state file so this run never conflicts with the system's
+# normal daily logrotate.timer pass over /etc/logrotate.d/.
+SHELL=/bin/bash
+
+5 * * * * root /usr/sbin/logrotate --state /var/lib/logrotate/mediawiki-access.status /etc/logrotate-mediawiki-access.conf
+

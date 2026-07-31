@@ -1,0 +1,17 @@
+# php-fpm-mediawiki — logrotate config for php-fpm's own logs
+# Uploaded to /tmp/ by Packer; installed by 01-php.sh into /etc/logrotate.d/.
+/var/log/mediawiki/php-fpm-error.log
+/var/log/mediawiki/php-fpm-www.log
+/var/log/mediawiki/php-fpm-slow.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    sharedscripts
+    postrotate
+        /usr/bin/systemctl kill -s USR1 php-fpm.service > /dev/null 2>&1 || true
+    endscript
+}
+

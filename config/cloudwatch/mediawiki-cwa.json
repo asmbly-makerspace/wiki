@@ -8,7 +8,7 @@
       "files": {
         "collect_list": [
           {
-            "file_path": "/var/log/httpd/mediawiki-error.log",
+            "file_path": "/var/log/mediawiki/error.log",
             "log_group_name": "/mediawiki/apache/error",
             "log_stream_name": "{instance_id}",
             "retention_in_days": 7,
@@ -22,8 +22,29 @@
             "auto_removal": true
           },
           {
+            "file_path": "/var/log/mariadb/mariadb-error.log",
+            "log_group_name": "/mediawiki/mariadb/error",
+            "log_stream_name": "{instance_id}",
+            "retention_in_days": 7,
+            "auto_removal": true
+          },
+          {
             "file_path": "/var/log/mariadb/slow.log",
             "log_group_name": "/mediawiki/mariadb/slow",
+            "log_stream_name": "{instance_id}",
+            "retention_in_days": 7,
+            "auto_removal": true
+          },
+          {
+            "file_path": "/var/log/mediawiki/php-fpm-error.log",
+            "log_group_name": "/mediawiki/php-fpm/error",
+            "log_stream_name": "{instance_id}",
+            "retention_in_days": 7,
+            "auto_removal": true
+          },
+          {
+            "file_path": "/var/log/mediawiki/php-fpm-www.log",
+            "log_group_name": "/mediawiki/php-fpm/www-error",
             "log_stream_name": "{instance_id}",
             "retention_in_days": 7,
             "auto_removal": true

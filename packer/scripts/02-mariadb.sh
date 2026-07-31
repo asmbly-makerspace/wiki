@@ -12,6 +12,19 @@ cp /tmp/config/mariadb/mariadb.repo /etc/yum.repos.d/mariadb.repo
 
 dnf install -y MariaDB-server MariaDB-client
 
+# ── Log directory ─────────────────────────────────────────────────────────────
+# The upstream MariaDB.org repo package (unlike AL2023's own mariadb105
+# packages) relies on a systemd-tmpfiles.d rule to create /var/log/mariadb,
+# which is only applied by systemd-tmpfiles-setup.service very early at boot —
+# it does NOT run as part of `dnf install`. Since this directory doesn't exist
+# yet when mysqld first starts below, slow_query_log_file / log_error in
+# mediawiki.cnf would silently fail to open (slow query logging disabled with
+# no visible error, general error log falling back to journald only). Create
+# it explicitly so both are guaranteed to work regardless of tmpfiles timing.
+mkdir -p /var/log/mariadb
+chown mysql:mysql /var/log/mariadb
+chmod 750 /var/log/mariadb
+
 # ── Start MariaDB for setup ───────────────────────────────────────────────────
 systemctl enable mariadb
 systemctl start mariadb

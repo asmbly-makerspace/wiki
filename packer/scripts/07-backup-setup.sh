@@ -32,8 +32,12 @@ chmod 644 /etc/cron.d/mediawiki-backup
 cp /tmp/config/logrotate/mediawiki-backup /etc/logrotate.d/mediawiki-backup
 
 # ── Create the log file ───────────────────────────────────────────────────────
+# World-readable: the amazon-cloudwatch-agent service does not run as root
+# (it tails files as its own service user), and this log contains no secrets
+# (DB credentials are never echoed by the backup scripts) — 640 root-owned
+# caused "permission denied" for the agent's [inputs.logfile] tailer.
 touch /var/log/mediawiki-backup.log
-chmod 640 /var/log/mediawiki-backup.log
+chmod 644 /var/log/mediawiki-backup.log
 
 # ── Remove staged config (last phase — no longer needed) ─────────────────────
 rm -rf /tmp/config

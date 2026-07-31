@@ -64,6 +64,18 @@ command -v mysqldump >/dev/null || fail "mysqldump not found"
 command -v tar      >/dev/null || fail "tar not found"
 [ -d "${MW_ROOT}" ] || fail "MediaWiki root not found: ${MW_ROOT}"
 
+# ── Preflight: enough space in the work dir's filesystem? ───────────────────
+NEEDED_KB=0
+if [ -d "${MW_ROOT}/images" ]; then
+  NEEDED_KB=$(du -sk "${MW_ROOT}/images" | cut -f1)
+fi
+NEEDED_KB=$(( (NEEDED_KB * 12) / 10 + 262144 ))  # +20% margin, +256MB for the DB dump
+AVAIL_KB=$(df -Pk "${WORK_DIR}" | awk 'NR==2 {print $4}')
+if [ "${AVAIL_KB}" -lt "${NEEDED_KB}" ]; then
+  df -h "${WORK_DIR}" >&2
+  fail "Not enough free space in $(dirname "${WORK_DIR}") (have ${AVAIL_KB}KB, need ~${NEEDED_KB}KB). Check for oversized logs under /var/log before retrying."
+fi
+
 # ── Auto-detect DB credentials from LocalSettings.php ────────────────────────
 LSETTINGS="${MW_ROOT}/LocalSettings.php"
 [ -f "${LSETTINGS}" ] || fail "LocalSettings.php not found at ${LSETTINGS}"
