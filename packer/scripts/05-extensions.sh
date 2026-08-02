@@ -106,10 +106,23 @@ echo "Composer update completed successfully"
 # DB_MASTER was renamed to DB_PRIMARY in MW 1.37 and removed in 1.42.
 # The 6.x release that fixed this requires PHP 8.4, which MW 1.43 does not
 # support. Patch the installed source directly; DB_PRIMARY has the same value.
-# TODO: [16-Jul-2026 04:01:55 UTC] PHP Deprecated:  Use of wfGetDB was deprecated in MediaWiki 1.39. [Called from MediaWiki\Extension\DiscourseSsoConsumer\Db::ensureCurrentSchema in /var/www/mediawiki/extensions/DiscourseSsoConsumer/src/Db.php at line 83] in /var/www/mediawiki/includes/debug/MWDebug.php on line 385
 echo "Patching DiscourseSsoConsumer: DB_MASTER → DB_PRIMARY"
 grep -rl --include='*.php' 'DB_MASTER' "${EXT_DIR}/DiscourseSsoConsumer" \
   | xargs sed -i 's/\bDB_MASTER\b/DB_PRIMARY/g'
+
+# wfGetDB() itself (independent of the DB_MASTER/DB_PRIMARY constant above)
+# was deprecated in MW 1.39 in favour of MediaWikiServices::getConnectionProvider().
+# Db::ensureCurrentSchema() calls it on every request, spamming
+# /var/log/mediawiki/php-fpm-www.log with a "PHP Deprecated" notice each time.
+# Patch to the non-deprecated equivalent instead of just tolerating the noise.
+echo "Patching DiscourseSsoConsumer: wfGetDB() → MediaWikiServices::getConnectionProvider()"
+{ grep -rlE --include='*.php' 'wfGetDB\s*\(' "${EXT_DIR}/DiscourseSsoConsumer" || true; } \
+  | while IFS= read -r f; do
+      sed -i -E \
+        -e 's/wfGetDB\(\s*DB_PRIMARY\s*\)/\\MediaWiki\\MediaWikiServices::getInstance()->getConnectionProvider()->getPrimaryDatabase()/g' \
+        -e 's/wfGetDB\(\s*DB_REPLICA\s*\)/\\MediaWiki\\MediaWikiServices::getInstance()->getConnectionProvider()->getReplicaDatabase()/g' \
+        "$f"
+    done
 
 EXPECTED_EXTENSIONS=("TemplateStyles" "DiscourseSsoConsumer" "IFrameTag" "PluggableAuth" "JsonConfig" "WikiCategoryTagCloud")
 for ext in "${EXPECTED_EXTENSIONS[@]}"; do

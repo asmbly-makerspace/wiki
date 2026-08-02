@@ -18,7 +18,9 @@ collation_server     = utf8mb4_unicode_ci
 query_cache_type = 0
 query_cache_size = 0
 
-# Logging — enable slow query log for debugging
+# Without an explicit log_error, MariaDB logs only to journald
+# which still works but isn't covered by CloudWatch.
+log_error            = /var/log/mariadb/mariadb-error.log
 slow_query_log      = 1
 slow_query_log_file = /var/log/mariadb/slow.log
 long_query_time     = 2

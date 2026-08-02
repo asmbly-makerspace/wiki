@@ -50,6 +50,30 @@ mkdir -p "${PHP_INI_DIR}"
 
 cp /tmp/config/php/mediawiki.ini "${PHP_INI_DIR}/mediawiki.ini"
 
+# ── php-fpm pool tuning + logging ─────────────────────────────────────────────
+# Shared with the Apache vhost logs — see 03-httpd.sh for the full rationale
+# on keeping MediaWiki's own logs out of package-managed directories/globs.
+mkdir -p /var/log/mediawiki
+chmod 755 /var/log/mediawiki
+
+# Drop-in pool overrides (merged into the package's [www] pool — see the file
+# itself for why this doesn't require editing/replacing www.conf).
+cp /tmp/config/php/www-mediawiki.conf /etc/php-fpm.d/zz-mediawiki.conf
+
+# The global error_log (in php-fpm.conf's [global] section, not per-pool) is
+# where the master process logs "server reached pm.max_children" warnings.
+# Redirect it out of /var/log/php-fpm/ for the same reason as the pool log
+# above. This edits the package's php-fpm.conf in place (never deleted), so
+# a future `dnf update` that ships a new default keeps our line intact and
+# drops its own version alongside as *.rpmnew rather than silently reverting it.
+sed -i -E 's#^;?\s*error_log\s*=.*#error_log = /var/log/mediawiki/php-fpm-error.log#' \
+  /etc/php-fpm.conf
+grep -q '^error_log = /var/log/mediawiki/php-fpm-error.log$' /etc/php-fpm.conf \
+  || { echo "ERROR: Failed to redirect php-fpm's global error_log in /etc/php-fpm.conf"; exit 1; }
+
+# Log rotation for the two paths above (daily, compressed, 14-day retention).
+cp /tmp/config/logrotate/php-fpm-mediawiki /etc/logrotate.d/php-fpm-mediawiki
+
 # ── Verify ────────────────────────────────────────────────────────────────────
 php --version
 php -m | grep -E "mbstring|intl|xml|gd|curl|opcache|mysqlnd"

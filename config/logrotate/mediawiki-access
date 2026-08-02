@@ -1,0 +1,21 @@
+# mediawiki-access — logrotate config for the high-volume Apache access log
+# Uploaded to /tmp/ by Packer; installed by 03-httpd.sh at
+# /etc/logrotate-mediawiki-access.conf (deliberately OUTSIDE /etc/logrotate.d/
+# so the system's daily logrotate.timer never processes it).
+#
+# Invoked hourly, with its own state file, by cron/mediawiki-access-logrotate.
+/var/log/mediawiki/access.log {
+    hourly
+    missingok
+    rotate 48
+    compress
+    delaycompress
+    notifempty
+    maxsize 100M
+    sharedscripts
+    postrotate
+        /usr/bin/systemctl reload httpd > /dev/null 2>&1 || true
+    endscript
+}
+
+

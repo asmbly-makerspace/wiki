@@ -1,6 +1,7 @@
-# httpd-mediawiki — logrotate config for Apache MediaWiki logs
-# Uploaded to /tmp/ by Packer; installed by 03-httpd.sh.
-/var/log/httpd/mediawiki-*.log {
+# httpd-mediawiki — logrotate config for the MediaWiki vhost's Apache error log
+# Uploaded to /tmp/ by Packer; installed by 03-httpd.sh into /etc/logrotate.d/,
+# where it is picked up by the system's normal daily logrotate.timer run.
+/var/log/mediawiki/error.log {
     daily
     missingok
     rotate 14
