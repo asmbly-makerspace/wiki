@@ -156,6 +156,9 @@ $wgNoFollowDomainExceptions = [ 'asmbly.org' ];
 
 $wgEnableCanonicalServerLink = true;
 
+# Sitemap lists only articles and categories (maintenance/generateSitemap.php)
+$wgSitemapNamespaces = [ NS_MAIN, NS_CATEGORY ];
+
 $wgNamespaceRobotPolicies = [
     NS_USER      => 'noindex,follow',
     NS_USER_TALK => 'noindex,follow',
