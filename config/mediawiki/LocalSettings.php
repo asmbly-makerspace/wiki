@@ -148,6 +148,21 @@ $wgRightsText = "Creative Commons Attribution-NonCommercial-ShareAlike";
 $wgRightsIcon = "$wgResourceBasePath/resources/assets/licenses/cc-by-nc-sa.png";
 
 # =============================================================================
+# SEO
+# =============================================================================
+
+# Links to asmbly.org and subdomains (e.g. classes.asmbly.org) are followed
+$wgNoFollowDomainExceptions = [ 'asmbly.org' ];
+
+$wgEnableCanonicalServerLink = true;
+
+$wgNamespaceRobotPolicies = [
+    NS_USER      => 'noindex,follow',
+    NS_USER_TALK => 'noindex,follow',
+    NS_TALK      => 'noindex,follow',
+];
+
+# =============================================================================
 # Locale
 # =============================================================================
 
@@ -294,6 +309,10 @@ $wgTitleBlacklistSources = [
 
 # ── WikiCategoryTagCloud — tag cloud on main page ────────────────────────────
 wfLoadExtension( 'WikiCategoryTagCloud' );
+
+# ── Description2 — <meta name="description"> and {{#description2:}} ──────────
+wfLoadExtension( 'Description2' );
+$wgEnableMetaDescriptionFunctions = true;
 
 # ── IFrameTag — embeds iframes (used for restreamer.asmbly.org) ──────────────
 wfLoadExtension( 'IFrameTag' );
