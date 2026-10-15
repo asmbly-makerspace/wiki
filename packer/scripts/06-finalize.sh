@@ -38,6 +38,13 @@ chown root:apache "${MW_ROOT}/LocalSettings.php"
 cp /tmp/config/cron/mediawiki-jobs /etc/cron.d/mediawiki-jobs
 chmod 644 /etc/cron.d/mediawiki-jobs
 
+# ── Weekly sitemap generation ─────────────────────────────────────────────────
+mkdir -p "${MW_ROOT}/sitemap"
+chown apache:apache "${MW_ROOT}/sitemap"
+chmod 755 "${MW_ROOT}/sitemap"
+cp /tmp/config/cron/mediawiki-sitemap /etc/cron.d/mediawiki-sitemap
+chmod 644 /etc/cron.d/mediawiki-sitemap
+
 # ── CloudWatch Agent — installed, configured, and enabled at boot ────────────
 # Requires the instance's IAM role to include CloudWatchAgentServerPolicy
 # (see docs/s3-backup-setup.md Step 5). Without it the agent starts but
