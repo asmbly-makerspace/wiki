@@ -43,6 +43,28 @@ if [[ "${INSTALLED_VER}" != "${PHP_PKG_SUFFIX}" ]]; then
   exit 1
 fi
 
+# ── Security patch floor ──────────────────────────────────────────────────────
+# dnf only version-locks at major.minor (php8.3), so the micro/patch build
+# actually installed depends on what AL2023's mirror currently carries —
+# assert it explicitly rather than trusting the mirror is already caught up.
+# Floor version is the single source of truth in ../php-security-floor.env
+# (currently ALAS2023-2026-3302 / CVE-2026-109618 / CVE-2026-109619).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../php-security-floor.env
+source "${SCRIPT_DIR}/../php-security-floor.env"
+FLOOR_VAR="PHP_SECURITY_FLOOR_${PHP_MAJOR}_${PHP_MINOR}"
+FLOOR="${!FLOOR_VAR:-}"
+if [[ -n "${FLOOR}" ]]; then
+  FULL_VER=$(php -r 'echo PHP_VERSION;')
+  if [[ "$(printf '%s\n%s\n' "${FLOOR}" "${FULL_VER}" | sort -V | head -1)" != "${FLOOR}" ]]; then
+    echo "ERROR: Installed PHP ${FULL_VER} is older than the required security floor ${FLOOR}"
+    echo "       See packer/php-security-floor.env for details (ALAS2023-2026-3302)."
+    echo "       AL2023 has not yet published a package meeting this floor for this architecture."
+    exit 1
+  fi
+  echo "PHP ${FULL_VER} >= security floor ${FLOOR} — OK"
+fi
+
 # ── php.ini tuning for MediaWiki ──────────────────────────────────────────────
 PHP_INI_DIR=$(php --ini 2>/dev/null | grep "Scan for additional" | awk '{print $NF}')
 PHP_INI_DIR="${PHP_INI_DIR:-/etc/php.d}"
