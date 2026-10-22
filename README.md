@@ -299,9 +299,9 @@ configured in core's `composer.json`.
   TextExtracts, Thanks, TitleBlacklist, VisualEditor, WikiEditor
 - **Installed via Composer** (`composer.local.json`): DiscourseSsoConsumer
   (→ PluggableAuth), IFrameTag, TemplateStyles, JsonConfig, PluggableAuth,
-  WikiCategoryTagCloud
+  WikiCategoryTagCloud, Description2
 
-  > TemplateStyles, JsonConfig, and WikiCategoryTagCloud are declared as
+  > TemplateStyles, JsonConfig, WikiCategoryTagCloud, and Description2 are declared as
   > `"package"` repositories (not `"vcs"`) because their upstream
   > `composer.json` files lack a `"name"` field. Composer's `vcs` driver
   > requires a name to resolve the package and skips branches without one

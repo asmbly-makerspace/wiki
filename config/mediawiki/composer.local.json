@@ -40,12 +40,26 @@
                     "reference": "REL1_43"
                 }
             }
+        },
+        {
+            "type": "package",
+            "package": {
+                "name": "mediawiki/description2",
+                "version": "dev-REL1_43",
+                "type": "mediawiki-extension",
+                "source": {
+                    "type": "git",
+                    "url": "https://gerrit.wikimedia.org/r/mediawiki/extensions/Description2",
+                    "reference": "REL1_43"
+                }
+            }
         }
     ],
     "require": {
         "mediawiki/template-styles": "dev-REL1_43",
         "mediawiki/json-config": "dev-REL1_43",
         "mediawiki/wiki-category-tag-cloud": "dev-REL1_43",
+        "mediawiki/description2": "dev-REL1_43",
         "centertap/discourse-sso-consumer": "5.0.2",
         "mediawiki/iframe-tag": "1.1.3"
     },

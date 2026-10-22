@@ -1,0 +1,6 @@
+# mediawiki-sitemap — cron.d job to regenerate the XML sitemap weekly
+# Uploaded to /tmp/ by Packer; installed by 06-finalize.sh.
+# Index is written to /sitemap/sitemap-index-<wikiid>.xml (wikiid = DB name).
+0 3 * * 0 apache php /var/www/mediawiki/maintenance/run.php generateSitemap \
+    --fspath=/var/www/mediawiki/sitemap --urlpath=/sitemap \
+    --server=https://wiki.asmbly.org --compress=no --skip-redirects --quiet 2>/dev/null

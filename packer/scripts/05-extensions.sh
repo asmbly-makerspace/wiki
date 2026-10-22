@@ -124,7 +124,7 @@ echo "Patching DiscourseSsoConsumer: wfGetDB() → MediaWikiServices::getConnect
         "$f"
     done
 
-EXPECTED_EXTENSIONS=("TemplateStyles" "DiscourseSsoConsumer" "IFrameTag" "PluggableAuth" "JsonConfig" "WikiCategoryTagCloud")
+EXPECTED_EXTENSIONS=("TemplateStyles" "DiscourseSsoConsumer" "IFrameTag" "PluggableAuth" "JsonConfig" "WikiCategoryTagCloud" "Description2")
 for ext in "${EXPECTED_EXTENSIONS[@]}"; do
   if [ ! -d "${EXT_DIR}/${ext}" ]; then
     echo "ERROR: Expected extension ${ext} not found in ${EXT_DIR}"
