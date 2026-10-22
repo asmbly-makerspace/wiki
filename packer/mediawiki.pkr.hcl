@@ -99,6 +99,13 @@ build {
     destination = "/tmp/config"
   }
 
+  # 01-php.sh sources this; Packer runs scripts from /tmp/script_*.sh, so the
+  # file must be uploaded explicitly.
+  provisioner "file" {
+    source      = "${path.root}/php-security-floor.env"
+    destination = "/tmp/php-security-floor.env"
+  }
+
   provisioner "file" {
     source      = "${path.root}/../scripts/"
     destination = "/tmp/mediawiki-ami-scripts"

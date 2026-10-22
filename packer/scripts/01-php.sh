@@ -47,11 +47,11 @@ fi
 # dnf only version-locks at major.minor (php8.3), so the micro/patch build
 # actually installed depends on what AL2023's mirror currently carries —
 # assert it explicitly rather than trusting the mirror is already caught up.
-# Floor version is the single source of truth in ../php-security-floor.env
+# Floor version is the single source of truth in packer/php-security-floor.env
 # (currently ALAS2023-2026-3302 / CVE-2026-109618 / CVE-2026-109619).
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Packer uploads the file to /tmp (scripts run from /tmp/script_*.sh).
 # shellcheck source=../php-security-floor.env
-source "${SCRIPT_DIR}/../php-security-floor.env"
+source /tmp/php-security-floor.env
 FLOOR_VAR="PHP_SECURITY_FLOOR_${PHP_MAJOR}_${PHP_MINOR}"
 FLOOR="${!FLOOR_VAR:-}"
 if [[ -n "${FLOOR}" ]]; then
