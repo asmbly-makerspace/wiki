@@ -102,11 +102,12 @@ You can also trigger it manually from the Actions UI with an optional dry-run.
    the CloudWatch agent is already installed, configured, and enabled at boot by the AMI;
    it just needs permission to publish.
 3. Attach the same Elastic IP / security groups as the old server (but do **not** move the EIP yet)
-4. Tag the instance and its root volume so the cost shows up under the wiki in billing
-   (see the [Asmbly AWS Tagging Guide](https://claude.ai/artifact/AxcYjFJYwkL7q8dpCDmR23)):
+4. Tag the new instance and its root volume. AWS doesn't copy tags from the old
+   server, so without this step the wiki's server cost shows up as untagged in the
+   AWS bill and can't be tracked as a wiki expense.
 
    ```bash
-   INSTANCE_ID=i-xxxxxxxxxxxxxxxxx
+   INSTANCE_ID=i-xxxxxxxxxxxxxxxxx   # the instance you just launched
    VOLUME_ID=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
      --query 'Reservations[0].Instances[0].BlockDeviceMappings[0].Ebs.VolumeId' --output text)
    aws ec2 create-tags --resources "$INSTANCE_ID" "$VOLUME_ID" --tags \
@@ -114,8 +115,9 @@ You can also trigger it manually from the Actions UI with an optional dry-run.
      Key=Owner,Value=it-volunteers Key=Workspace,Value=org-wide Key=ManagedBy,Value=manual
    ```
 
-   Use `ManagedBy=manual`, never `packer`: the Packer build role can stop and
-   terminate anything tagged `ManagedBy=packer`.
+   Keep `ManagedBy=manual` on the live server. The AMIs are tagged `ManagedBy=packer`,
+   and the Packer build role is allowed to stop and terminate anything with that tag,
+   so copying the AMI's tags onto the server would put it at risk.
 
 ---
 
@@ -165,8 +167,14 @@ When satisfied:
 1. Move the Elastic IP to the new instance
 2. Confirm DNS resolves to the new instance (`dig wiki.asmbly.org`)
 3. Keep the old instance **stopped** (not terminated) for 72 hours as a rollback option
-4. Retag the old instance and its volume with `Component=retired-server` so its
-   leftover disk cost is easy to spot until it's terminated
+4. Change the old instance's `Component` tag (and its volume's) to `retired-server`.
+   Stopped servers still cost money for their disks, and this tag makes that cost
+   easy to find in the bill until the old instance is terminated:
+
+   ```bash
+   aws ec2 create-tags --resources "$OLD_INSTANCE_ID" "$OLD_VOLUME_ID" \
+     --tags Key=Component,Value=retired-server
+   ```
 
 ---
 
