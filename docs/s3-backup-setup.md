@@ -65,7 +65,7 @@ otherwise run inside the backup script.
 
 | Tier | Prefix | Uploaded when | S3 Lifecycle behaviour                                                                  |
 |------|--------|--------------|-----------------------------------------------------------------------------------------|
-| Daily | `backups/daily/` | Every night | Expire after **5 days**                                                                 |
+| Daily | `backups/daily/<timestamp>/` | Every night | Expire after **5 days**                                                                 |
 | Weekly | `backups/weekly/YYYY-WNN/` | Every Sunday | → STANDARD_IA after 14d → expire after **57 days** (~8 weeks)                           |
 | Monthly | `backups/monthly/YYYY-MM/` | 1st of month | → STANDARD_IA after 30d → GLACIER_IR after 90d → expire after **366 days** (~12 months) |
 
@@ -164,11 +164,12 @@ sudo systemctl status crond
 # List all backup prefixes
 aws s3 ls "s3://${BACKUP_BUCKET}/backups/" --region "${AWS_REGION}"
 
-# List the latest daily backup
-aws s3 ls "s3://${BACKUP_BUCKET}/backups/daily/" --region "${AWS_REGION}"
+# List the latest successful daily backup
+LATEST=$(aws s3 cp "s3://${BACKUP_BUCKET}/backups/latest.txt" - --region "${AWS_REGION}")
+aws s3 ls "s3://${BACKUP_BUCKET}/backups/${LATEST}/" --region "${AWS_REGION}"
 
 # Confirm the manifest
-aws s3 cp "s3://${BACKUP_BUCKET}/backups/daily/manifest.txt" - --region "${AWS_REGION}"
+aws s3 cp "s3://${BACKUP_BUCKET}/backups/${LATEST}/manifest.txt" - --region "${AWS_REGION}"
 ```
 
 ### Manually trigger a backup (for testing)

@@ -45,7 +45,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
 HOSTNAME_SHORT=$(hostname -s)
 BACKUP_TAG="${BACKUP_TAG:-${HOSTNAME_SHORT}-${TIMESTAMP}}"
 S3_PREFIX="backups/${BACKUP_TAG}"
-WORK_DIR=$(mktemp -d /tmp/mw-backup-XXXXXX)
+WORK_DIR=$(mktemp -d /var/tmp/mw-backup-XXXXXX)
 MANIFEST="${WORK_DIR}/manifest.txt"
 
 log()  { echo "[$(date -u +%H:%M:%S)] $*"; }

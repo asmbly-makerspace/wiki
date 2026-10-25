@@ -9,7 +9,7 @@
 #
 # ── Build base image + provision (Packer) ────────────────────────────────────
 #  packer-test/test-local.sh build              # build base image (once, or after Dockerfile.test changes)
-#  packer init packer/ && packer build -only='*.docker.mediawiki' -var-file=packer-test/test.pkrvars.hcl packer/
+#  packer-test/test-local.sh packer-build       # packer init + build, authenticated via `gh auth token` if available
 #
 # ── Run the provisioned image ────────────────────────────────────────────────
 #  ./test-local.sh start          # start persistent container from mediawiki-local:latest
@@ -64,6 +64,21 @@ _inject_mock_aws() {
   podman exec "${CONTAINER_NAME}" chmod +x /usr/local/bin/aws
 }
 
+# Sets GH_TOKEN_ARGS (a -var override, which beats -var-file) and exports
+# PACKER_GITHUB_API_TOKEN (packer init plugin downloads) from the gh login.
+# GITHUB_TOKEN/GH_TOKEN env vars are honoured by gh itself.
+GH_TOKEN_ARGS=()
+_use_gh_token() {
+  local tok=""
+  command -v gh >/dev/null 2>&1 && tok="$(gh auth token 2>/dev/null || true)"
+  if [[ -z "${tok}" ]]; then
+    echo "WARN: no gh token (run 'gh auth login'); using github_token from var-file/env." >&2
+    return
+  fi
+  export PACKER_GITHUB_API_TOKEN="${tok}"
+  GH_TOKEN_ARGS=(-var "github_token=${tok}")
+}
+
 CMD="${1:-start}"
 shift || true
 
@@ -75,7 +90,15 @@ build)
   podman build -t "${BASE_IMAGE_NAME}" -f "${TEST_DIR}/Dockerfile.test" "${TEST_DIR}"
   echo "==> Done. Next:"
   echo "    cp packer-test/test.pkrvars.hcl.example packer-test/test.pkrvars.hcl   # once; edit as needed"
-  echo "    packer build -only='*.docker.mediawiki' -var-file=packer-test/test.pkrvars.hcl packer/"
+  echo "    test-local.sh packer-build"
+  ;;
+
+# ── packer init + build using the local gh token ────────────────────────────
+packer-build)
+  _use_gh_token
+  cd "${REPO_ROOT}"
+  packer init packer/
+  packer build -only='*.docker.mediawiki' -var-file="${TEST_DIR}/test.pkrvars.hcl" "${GH_TOKEN_ARGS[@]}" "$@" packer/
   ;;
 
 # ── Start a persistent container from the packer-provisioned image ──────────
@@ -223,6 +246,9 @@ Image / provisioning:
                               cp packer-test/test.pkrvars.hcl.example packer-test/test.pkrvars.hcl
                               mkdir -p output
                               packer build -only='*.docker.mediawiki' -var-file=packer-test/test.pkrvars.hcl packer/
+
+  packer-build [args]       packer init + build docker.mediawiki; uses 'gh auth token'
+                            for PACKER_GITHUB_API_TOKEN / PKR_VAR_github_token if unset
 
 Run the provisioned image (mediawiki-local:latest):
   start                     Start a persistent container from it

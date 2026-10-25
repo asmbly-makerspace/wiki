@@ -15,7 +15,8 @@ mw_discourse_secret  = "test-discourse-secret"
 backup_bucket        = "test-backup-bucket"
 
 # GitHub PAT — needs read:contents (public repos) or repo scope (private
-# repos), used by 05-extensions.sh. Generate at: https://github.com/settings/tokens
-github_token = "ghp_yourTokenHere"
+# repos), used by 05-extensions.sh. Optional: `test-local.sh packer-build`
+# overrides this with `gh auth token` when gh is logged in.
+# github_token = "ghp_yourTokenHere"
 
 

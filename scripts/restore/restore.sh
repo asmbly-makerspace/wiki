@@ -12,8 +12,8 @@
 #
 # Optional env vars:
 #   BACKUP_TIMESTAMP    — S3 prefix under backups/ to restore from
-#                         e.g. "daily", "weekly/2026-W24", "monthly/2026-05"
-#                         Defaults to "daily" (reads backups/latest.txt)
+#                         e.g. "daily/2026-10-25T08-00-01Z", "weekly/2026-W24", "monthly/2026-05"
+#                         Defaults to the latest successful run (reads backups/latest.txt)
 #   AWS_REGION          — default: us-east-2
 #   MW_ROOT             — default: /var/www/mediawiki
 #   MW_DB_NAME/USER/PASS/HOST — override DB credentials (default: read from LocalSettings.php)
@@ -42,7 +42,7 @@ AWS_REGION="${AWS_REGION:-us-east-2}"
 MW_ROOT="${MW_ROOT:-/var/www/mediawiki}"
 SKIP_IMAGES="${SKIP_IMAGES:-0}"
 
-WORK_DIR=$(mktemp -d /tmp/mw-restore-XXXXXX)
+WORK_DIR=$(mktemp -d /var/tmp/mw-restore-XXXXXX)
 
 log()  { echo "[$(date -u +"%Y-%m-%d %H:%M:%S")] $*"; }
 warn() { echo "[$(date -u +"%Y-%m-%d %H:%M:%S")] WARN:  $*" >&2; }

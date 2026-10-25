@@ -3,8 +3,8 @@
 # Automated MediaWiki backup with Grandfather-Father-Son (GFS) rotation on S3.
 #
 # Retention Policy (enforced by S3 Lifecycle Rules — see docs/s3-backup-setup.md):
-#   - Daily:   overwrite each night  → expire after 2 days
-#   - Weekly:  Sundays promoted      → expire after 57 days (~8 weeks)
+#   - Daily:   new daily/<timestamp>/ prefix each night → expired by S3 Lifecycle
+#   - Weekly:  Sundays promoted      → expire after 58 days (~8 weeks)
 #   - Monthly: 1st of month promoted → expire after 366 days (~12 months)
 #
 # This script only uploads. Deletion is handled automatically by AWS S3 Lifecycle.
@@ -42,11 +42,20 @@ DOW=$(date -u +"%u")           # 1=Mon ... 7=Sun
 DOM=$(date -u +"%d")           # Day of month (01-31)
 WEEK_NUM=$(date -u +"%Y-W%V") # ISO week number (e.g. 2026-W24)
 MONTH_TAG=$(date -u +"%Y-%m") # e.g. 2026-06
-WORK_DIR=$(mktemp -d /tmp/mw-backup-gfs-XXXXXX)
+DAILY_PREFIX="daily/${TIMESTAMP}"  # unique per run; never overwritten or deleted by this host
+# Archives are streamed straight to S3; WORK_DIR only holds FIFOs, checksums and the manifest.
+WORK_DIR=$(mktemp -d /var/tmp/mw-backup-gfs-XXXXXX)
 
 log()  { echo "[$(date -u +"%Y-%m-%d %H:%M:%S")] $*"; }
 fail() { echo "[$(date -u +"%Y-%m-%d %H:%M:%S")] ERROR: $*" >&2; exit 1; }
-trap 'rm -rf "${WORK_DIR}"' EXIT
+cleanup() {
+  local rc=$?
+  # No deletes here by design: the instance has no s3:DeleteObject. A failed run
+  # never updates latest.txt; its partial objects are expired by S3 Lifecycle.
+  [ "${rc}" -ne 0 ] && echo "[$(date -u +"%Y-%m-%d %H:%M:%S")] ERROR: backup failed (exit ${rc}); latest.txt not updated" >&2
+  rm -rf "${WORK_DIR}"
+}
+trap cleanup EXIT
 
 log "=== MediaWiki GFS Backup ==="
 log "Bucket: ${BACKUP_BUCKET} | Region: ${AWS_REGION}"
@@ -59,22 +68,6 @@ command -v mysqldump >/dev/null || fail "mysqldump not found"
 
 LSETTINGS="${MW_ROOT}/LocalSettings.php"
 [ -f "${LSETTINGS}" ] || fail "LocalSettings.php not found"
-
-# ── Preflight: enough space in the work dir's filesystem? ───────────────────
-# Images copy compresses ~1:1 in the worst case (already-compressed media);
-# require room for a full uncompressed copy of images/ plus the DB, with a
-# safety margin, instead of failing midway through tar/gzip with a cryptic
-# "No space left on device".
-NEEDED_KB=0
-if [ -d "${MW_ROOT}/images" ]; then
-  NEEDED_KB=$(du -sk "${MW_ROOT}/images" | cut -f1)
-fi
-NEEDED_KB=$(( (NEEDED_KB * 12) / 10 + 262144 ))  # +20% margin, +256MB for the DB dump
-AVAIL_KB=$(df -Pk "${WORK_DIR}" | awk 'NR==2 {print $4}')
-if [ "${AVAIL_KB}" -lt "${NEEDED_KB}" ]; then
-  df -h "${WORK_DIR}" >&2
-  fail "Not enough free space in $(dirname "${WORK_DIR}") (have ${AVAIL_KB}KB, need ~${NEEDED_KB}KB). Check for oversized logs under /var/log (see logrotate.d/httpd-mediawiki, logrotate-mediawiki-access.conf) before retrying."
-fi
 
 # ── Extract DB credentials from LocalSettings.php ────────────────────────────
 extract_setting() {
@@ -111,9 +104,30 @@ MW_DB_HOST="${MW_DB_HOST:-localhost}"
 [ -n "${MW_DB_NAME}" ] || fail "Could not determine DB name"
 log "DB: ${MW_DB_USER}@${MW_DB_HOST}/${MW_DB_NAME}"
 
-# ── Step 1: Dump database ─────────────────────────────────────────────────────
-log "--- Dumping database ---"
-DB_DUMP="${WORK_DIR}/mediawiki-db-${TIMESTAMP}.sql.gz"
+# ── Streaming upload helper ───────────────────────────────────────────────────
+# Reads an archive from stdin and uploads it to S3 without touching local disk,
+# recording its sha256 and size for the manifest via FIFOs (process
+# substitutions can't be reliably waited on).
+UPLOADED=()
+stream_to_s3() {
+  local name="$1"
+  local hash_fifo="${WORK_DIR}/${name}.hash.fifo" size_fifo="${WORK_DIR}/${name}.size.fifo"
+  mkfifo "${hash_fifo}" "${size_fifo}"
+  sha256sum < "${hash_fifo}" | awk '{print $1}' > "${WORK_DIR}/${name}.sha256" &
+  local hash_pid=$!
+  wc -c < "${size_fifo}" > "${WORK_DIR}/${name}.bytes" &
+  local size_pid=$!
+  tee "${hash_fifo}" "${size_fifo}" \
+    | aws s3 cp - "s3://${BACKUP_BUCKET}/backups/${DAILY_PREFIX}/${name}" \
+        --region "${AWS_REGION}" --no-progress --storage-class STANDARD
+  wait "${hash_pid}" "${size_pid}"
+  echo "file=${name} sha256=$(cat "${WORK_DIR}/${name}.sha256") bytes=$(tr -d ' ' < "${WORK_DIR}/${name}.bytes")" \
+    >> "${WORK_DIR}/manifest.entries"
+}
+
+# ── Step 1: Stream database dump to daily/ ──────────────────────────────────
+log "--- Dumping database → ${DAILY_PREFIX}/ ---"
+DB_NAME="mediawiki-db-${TIMESTAMP}.sql.gz"
 mysqldump \
   --host="${MW_DB_HOST}" \
   --user="${MW_DB_USER}" \
@@ -124,71 +138,71 @@ mysqldump \
   --routines \
   --triggers \
   "${MW_DB_NAME}" \
-  | gzip -6 > "${DB_DUMP}"
-log "  DB dump: $(du -sh "${DB_DUMP}" | cut -f1)"
+  | gzip -6 | stream_to_s3 "${DB_NAME}"
+UPLOADED+=("${DB_NAME}")
+log "  DB dump: $(tr -d ' ' < "${WORK_DIR}/${DB_NAME}.bytes") bytes"
 
-# ── Step 2: Archive images ────────────────────────────────────────────────────
-log "--- Archiving images ---"
-IMAGES_ARCHIVE="${WORK_DIR}/mediawiki-images-${TIMESTAMP}.tar.gz"
+# ── Step 2: Stream images archive to daily/ ─────────────────────────────────
+log "--- Archiving images → ${DAILY_PREFIX}/ ---"
 if [ -d "${MW_ROOT}/images" ]; then
-  tar -czf "${IMAGES_ARCHIVE}" -C "${MW_ROOT}" images/
-  log "  Images: $(du -sh "${IMAGES_ARCHIVE}" | cut -f1)"
+  IMAGES_NAME="mediawiki-images-${TIMESTAMP}.tar.gz"
+  # gzip -1: images are mostly already-compressed media; higher levels just burn CPU.
+  tar -cf - -C "${MW_ROOT}" images/ | gzip -1 | stream_to_s3 "${IMAGES_NAME}"
+  UPLOADED+=("${IMAGES_NAME}")
+  log "  Images: $(tr -d ' ' < "${WORK_DIR}/${IMAGES_NAME}.bytes") bytes"
 else
   log "  WARNING: images/ not found — skipping"
-  IMAGES_ARCHIVE=""
 fi
 
-# ── Step 3: Archive config ────────────────────────────────────────────────────
-log "--- Archiving config ---"
-CONFIG_ARCHIVE="${WORK_DIR}/mediawiki-config-${TIMESTAMP}.tar.gz"
+# ── Step 3: Stream config archive to daily/ ─────────────────────────────────
+log "--- Archiving config → ${DAILY_PREFIX}/ ---"
+CONFIG_NAME="mediawiki-config-${TIMESTAMP}.tar.gz"
 CONFIG_FILES=("${MW_ROOT}/LocalSettings.php")
 for f in /etc/httpd/conf.d/wiki*.conf /etc/sysconfig/mediawiki-backup; do
   [ -f "$f" ] && CONFIG_FILES+=("$f")
 done
-tar -czf "${CONFIG_ARCHIVE}" "${CONFIG_FILES[@]}" 2>/dev/null || true
-log "  Config: $(du -sh "${CONFIG_ARCHIVE}" | cut -f1)"
+{ tar -czf - "${CONFIG_FILES[@]}" 2>/dev/null || true; } | stream_to_s3 "${CONFIG_NAME}"
+UPLOADED+=("${CONFIG_NAME}")
+log "  Config: $(tr -d ' ' < "${WORK_DIR}/${CONFIG_NAME}.bytes") bytes"
 
-# ── Step 4: Generate manifest ─────────────────────────────────────────────────
+# ── Step 4: Upload manifest ──────────────────────────────────────────────────
 MANIFEST="${WORK_DIR}/manifest.txt"
 {
   echo "timestamp=${TIMESTAMP}"
   echo "host=$(hostname -f 2>/dev/null || hostname)"
   echo "db_name=${MW_DB_NAME}"
   echo "mediawiki_root=${MW_ROOT}"
-  for f in "${WORK_DIR}"/*.gz; do
-    [ -f "$f" ] || continue
-    sha=$(sha256sum "$f" | awk '{print $1}')
-    size=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null)
-    echo "file=$(basename "$f") sha256=${sha} bytes=${size}"
-  done
+  cat "${WORK_DIR}/manifest.entries"
 } > "${MANIFEST}"
+aws s3 cp "${MANIFEST}" "s3://${BACKUP_BUCKET}/backups/${DAILY_PREFIX}/manifest.txt" \
+  --region "${AWS_REGION}" --no-progress --storage-class STANDARD
+UPLOADED+=("manifest.txt")
 
-# ── Step 5: Upload to S3 — DAILY tier ────────────────────────────────────────
-# Overwrites previous daily backup. S3 Lifecycle expires objects after 2 days.
-log "--- Uploading to daily/ (replacing previous) ---"
-aws s3 rm "s3://${BACKUP_BUCKET}/backups/daily/" \
-  --recursive --region "${AWS_REGION}" --quiet 2>/dev/null || true
-
-for f in "${WORK_DIR}"/*.gz "${MANIFEST}"; do
-  [ -f "$f" ] || continue
-  aws s3 cp "$f" "s3://${BACKUP_BUCKET}/backups/daily/$(basename "$f")" \
-    --region "${AWS_REGION}" --no-progress --storage-class STANDARD
-done
-log "  Daily backup uploaded"
-
-# Update latest pointer
-echo "daily" | aws s3 cp - "s3://${BACKUP_BUCKET}/backups/latest.txt" \
+# ── Step 5: Point latest.txt at this run ─────────────────────────────────────
+# Only reached after every object uploaded successfully. Old daily/ runs are
+# expired by S3 Lifecycle (see docs/lifecycle.json).
+echo "${DAILY_PREFIX}" | aws s3 cp - "s3://${BACKUP_BUCKET}/backups/latest.txt" \
   --region "${AWS_REGION}" --content-type "text/plain"
+log "  Daily backup uploaded: ${DAILY_PREFIX}"
+
+# Server-side copy from this run's daily/ prefix into a GFS tier (no re-upload from this host).
+# --copy-props metadata-directive: the default also copies tags, which needs
+# s3:GetObjectTagging/PutObjectTagging; these objects carry no tags.
+promote() {
+  local tier_prefix="$1" name
+  for name in "${UPLOADED[@]}"; do
+    aws s3 cp "s3://${BACKUP_BUCKET}/backups/${DAILY_PREFIX}/${name}" \
+      "s3://${BACKUP_BUCKET}/backups/${tier_prefix}/${name}" \
+      --region "${AWS_REGION}" --no-progress --storage-class STANDARD \
+      --copy-props metadata-directive
+  done
+}
 
 # ── Step 6: Promote to WEEKLY tier (Sundays) ─────────────────────────────────
 # S3 Lifecycle transitions to STANDARD_IA after 14 days, expires after 57 days.
 if [ "${DOW}" = "7" ]; then
   log "--- Sunday: promoting to weekly/${WEEK_NUM}/ ---"
-  for f in "${WORK_DIR}"/*.gz "${MANIFEST}"; do
-    [ -f "$f" ] || continue
-    aws s3 cp "$f" "s3://${BACKUP_BUCKET}/backups/weekly/${WEEK_NUM}/$(basename "$f")" \
-      --region "${AWS_REGION}" --no-progress --storage-class STANDARD
-  done
+  promote "weekly/${WEEK_NUM}"
   log "  Weekly backup stored: ${WEEK_NUM}"
 fi
 
@@ -197,16 +211,12 @@ fi
 # and expires after 366 days.
 if [ "${DOM}" = "01" ]; then
   log "--- 1st of month: promoting to monthly/${MONTH_TAG}/ ---"
-  for f in "${WORK_DIR}"/*.gz "${MANIFEST}"; do
-    [ -f "$f" ] || continue
-    aws s3 cp "$f" "s3://${BACKUP_BUCKET}/backups/monthly/${MONTH_TAG}/$(basename "$f")" \
-      --region "${AWS_REGION}" --no-progress --storage-class STANDARD
-  done
+  promote "monthly/${MONTH_TAG}"
   log "  Monthly backup stored: ${MONTH_TAG}"
 fi
 
 log "=== GFS Backup complete ==="
-log "  Daily:   s3://${BACKUP_BUCKET}/backups/daily/"
+log "  Daily:   s3://${BACKUP_BUCKET}/backups/${DAILY_PREFIX}/"
 [ "${DOW}" = "7" ]  && log "  Weekly:  s3://${BACKUP_BUCKET}/backups/weekly/${WEEK_NUM}/"
 [ "${DOM}" = "01" ] && log "  Monthly: s3://${BACKUP_BUCKET}/backups/monthly/${MONTH_TAG}/"
 log "  Retention is managed by S3 Lifecycle Rules — see docs/s3-backup-setup.md"
