@@ -51,6 +51,9 @@ fi
 log "--- Step 1: Running maintenance/update.php ---"
 log "  Output → ${UPDATE_LOG}"
 cd "${MW_ROOT}"
+# NOTE: Do not run maintenance scripts directly, use maintenance/run.php instead!
+  #      Running scripts directly has been deprecated in MediaWiki 1.40.
+  #      It may not work for some (or any) scripts in the future.
 php maintenance/update.php --quick 2>&1 | tee "${UPDATE_LOG}"
 
 if grep -qiE "^(Fatal|Wikimedia\\\\Rdbms\\\\DBQueryError)" "${UPDATE_LOG}" 2>/dev/null; then
@@ -62,19 +65,19 @@ log "  update.php completed"
 log "--- Step 2: Post-upgrade maintenance ---"
 
 log "  rebuildrecentchanges.php …"
-php maintenance/rebuildrecentchanges.php 2>/dev/null \
+php maintenance/run.php rebuildrecentchanges 2>/dev/null \
     || warn "rebuildrecentchanges.php failed (non-fatal)"
 
 log "  initSiteStats.php …"
-php maintenance/initSiteStats.php --update 2>/dev/null \
+php maintenance/run.php initSiteStats --update 2>/dev/null \
     || warn "initSiteStats.php failed (non-fatal)"
 
 log "  rebuildall.php (rebuilds link tables) …"
-php maintenance/rebuildall.php 2>/dev/null \
+php maintenance/run.php rebuildall 2>/dev/null \
     || warn "rebuildall.php failed (non-fatal)"
 
 log "  checkBadRedirects.php …"
-php maintenance/checkBadRedirects.php 2>/dev/null \
+php maintenance/run.php checkBadRedirects 2>/dev/null \
     || warn "checkBadRedirects.php failed (non-fatal)"
 
 log "=== Upgrade complete ==="

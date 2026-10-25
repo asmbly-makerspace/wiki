@@ -40,11 +40,13 @@ case "${ACTION}" in
     while [[ $# -gt 0 ]]; do
       case "$1" in
         # known two-argument flags
-        --region|--storage-class|--content-type|--metadata|--sse|--acl|--expected-size)
+        --region|--storage-class|--content-type|--metadata|--sse|--acl|--expected-size|--copy-props)
           shift 2 ;;
         # known single-argument flags
         --recursive|--no-progress|--quiet|--only-show-errors|--no-sign-request|--dryrun)
           shift ;;
+        # bare '-' is stdin/stdout, not a flag
+        -)  POSITIONAL+=("$1"); shift ;;
         # skip any other flag without trying to guess its arity
         -*) shift ;;
         *)  POSITIONAL+=("$1"); shift ;;

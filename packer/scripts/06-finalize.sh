@@ -75,7 +75,7 @@ mkdir -p /opt/mediawiki-ami
 
 # ── Package cache cleanup ─────────────────────────────────────────────────────
 dnf clean all
-rm -rf /var/cache/dnf /tmp/*.tar.gz /tmp/*.gz /tmp/mw-*
+rm -rf /var/cache/dnf /tmp/*.tar.gz /tmp/*.gz /tmp/mw-* /var/tmp/mw-*
 # /tmp/config is removed by 07-backup-setup.sh — it is needed through the final phase
 
 # ── Remove SSH host keys (regenerated on first boot) ─────────────────────────

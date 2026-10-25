@@ -15,7 +15,7 @@ BACKUP_BUCKET="${BACKUP_BUCKET:?BACKUP_BUCKET must be set}"
 AWS_REGION="${AWS_REGION:-us-east-2}"
 MW_ROOT="${MW_ROOT:-/var/www/mediawiki}"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
-WORK_DIR=$(mktemp -d /tmp/mw-config-XXXXXX)
+WORK_DIR=$(mktemp -d /var/tmp/mw-config-XXXXXX)
 
 log()  { echo "[$(date -u +%H:%M:%S)] $*"; }
 fail() { echo "[ERROR] $*" >&2; exit 1; }

@@ -176,7 +176,7 @@ via `/etc/cron.d/mediawiki-backup`. It uploads to S3 with GFS rotation:
 
 | Tier | When | S3 prefix | Expires |
 |------|------|-----------|---------|
-| Daily | Every night | `backups/daily/` | 2 days (S3 Lifecycle) |
+| Daily | Every night | `backups/daily/<timestamp>/` | 2 days (S3 Lifecycle) |
 | Weekly | Sundays | `backups/weekly/YYYY-WNN/` | 57 days (S3 Lifecycle) |
 | Monthly | 1st of month | `backups/monthly/YYYY-MM/` | 366 days (S3 Lifecycle) |
 
