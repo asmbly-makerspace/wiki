@@ -59,6 +59,12 @@ Disallow: /index.php?title=MediaWiki
 Disallow: /index.php?title=Special:
 Disallow: /index.php?title=Template
 
+# ── Full-size uploads ─────────────────────────────────────────────────────────
+# Originals are large; crawlers get the (small) thumbnails embedded in pages.
+# The longer Allow wins over Disallow (RFC 9309), so thumbs stay crawlable.
+Disallow: /images/
+Allow: /images/thumb/
+
 # ── Printable versions (duplicate content) ────────────────────────────────────
 Disallow: /*?printable=yes
 
