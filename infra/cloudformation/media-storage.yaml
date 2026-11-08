@@ -20,16 +20,19 @@ Description: >-
 #   $wgAWSBucketDomain = 'cdn.asmbly.org';
 #   $wgAWSRepoHashLevels = '2';
 #   $wgAWSRepoDeletedHashLevels = '3';
+#   $wgFileBackends['s3']['privateWiki'] = true;  # upload with ACL private
 #
 # One bucket and CDN hostname are shared by several sites, each under its own
 # prefix: wiki/ (read-write from the wiki instance) and classes/ (served by
 # CloudFront only; the wiki instance has no access to it). Seed existing files with:
 #   aws s3 sync images/ s3://asmbly-media/wiki/ --exclude 'thumb/*' --exclude 'temp/*'
 #
-# Extension:AWS uploads with ACL public-read. The bucket accepts those ACLs but
-# IgnorePublicAcls makes S3 disregard them, so objects are only readable via
-# CloudFront. Versioning is the recovery path for deleted/overwritten files,
-# replacing the images/ tarball in the nightly backup.
+# Objects are private and only readable via CloudFront. Extension:AWS normally
+# uploads with ACL public-read; privateWiki makes it send ACL private, so public
+# ACLs can be blocked outright. The extension marks its deleted/ and temp/ zones
+# private with ACLs alone, which CloudFront ignores, so the bucket policy denies
+# them. Versioning is the recovery path for deleted/overwritten files, replacing
+# the images/ tarball in the nightly backup.
 
 Parameters:
   BucketName:
@@ -60,6 +63,12 @@ Parameters:
     MinValue: 1
     Description: Days to keep overwritten or deleted file versions.
 
+Rules:
+  MustBeUsEast2:
+    Assertions:
+      - Assert: !Equals [!Ref "AWS::Region", us-east-2]
+        AssertDescription: Deploy in us-east-2 ($wgAWSRegion in LocalSettings.php).
+
 Conditions:
   AttachToRole: !Not [!Equals [!Ref InstanceRoleName, ""]]
 
@@ -74,7 +83,7 @@ Resources:
         Rules:
           - ObjectOwnership: BucketOwnerPreferred
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
+        BlockPublicAcls: true
         IgnorePublicAcls: true
         BlockPublicPolicy: true
         RestrictPublicBuckets: true
@@ -91,6 +100,12 @@ Resources:
             NoncurrentVersionExpiration:
               NoncurrentDays: !Ref NoncurrentVersionDays
             ExpiredObjectDeleteMarker: true
+          # Thumbnails are regenerated on purge/re-upload; old versions have no value.
+          - Id: expire-old-thumb-versions
+            Status: Enabled
+            Prefix: !Sub ${MediaPrefix}/thumb/
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
           - Id: abort-incomplete-uploads
             Status: Enabled
             AbortIncompleteMultipartUpload:
@@ -114,6 +129,14 @@ Resources:
             Condition:
               StringLike:
                 AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${DistributionId}
+          - Sid: CloudFrontDenyPrivateZones
+            Effect: Deny
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource:
+              - !Sub ${MediaBucket.Arn}/${MediaPrefix}/deleted/*
+              - !Sub ${MediaBucket.Arn}/${MediaPrefix}/temp/*
           - Sid: DenyInsecureTransport
             Effect: Deny
             Principal: "*"

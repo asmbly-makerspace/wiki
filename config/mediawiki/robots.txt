@@ -60,6 +60,9 @@ Disallow: /index.php?title=Special:
 Disallow: /index.php?title=Template
 
 # ── Full-size uploads ─────────────────────────────────────────────────────────
+# Uploads are now served from cdn.asmbly.org, whose robots.txt (same agent
+# groups; PDFs open, originals for Googlebot-Image only) is generated in
+# infra/cloudformation/media-cdn.yaml. These rules cover legacy /images/ URLs.
 # Originals are large; crawlers get the (small) thumbnails embedded in pages.
 # The longer Allow wins over Disallow (RFC 9309), so thumbs stay crawlable.
 Disallow: /images/

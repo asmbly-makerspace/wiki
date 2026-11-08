@@ -119,6 +119,9 @@ $wgAWSBucketTopSubdirectory = '/wiki';
 $wgAWSBucketDomain          = 'cdn.asmbly.org';
 $wgAWSRepoHashLevels        = '2';
 $wgAWSRepoDeletedHashLevels = '3';
+# Upload with ACL private (default is public-read, which the bucket blocks).
+# Files are still public through CloudFront; this doesn't change URLs.
+$wgFileBackends['s3']['privateWiki'] = true;
 
 # Same additional types as 1.35 server
 $wgFileExtensions = array_merge(
