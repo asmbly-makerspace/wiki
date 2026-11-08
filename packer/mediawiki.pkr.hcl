@@ -26,6 +26,10 @@ locals {
   common_tags = merge(
     {
       Project          = "mediawiki-ami"
+      Component        = "image"
+      Environment      = "prod"
+      Owner            = "it-volunteers"
+      Workspace        = "org-wide"
       MediaWikiVersion = var.mediawiki_version
       BuildTimestamp   = local.timestamp
       ManagedBy        = "packer"
