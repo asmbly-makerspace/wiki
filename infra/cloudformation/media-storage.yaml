@@ -79,6 +79,13 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Ref BucketName
+      Tags:
+        - { Key: Project, Value: mediawiki-ami }
+        - { Key: Component, Value: media }
+        - { Key: Environment, Value: prod }
+        - { Key: Owner, Value: it-volunteers }
+        - { Key: Workspace, Value: org-wide }
+        - { Key: ManagedBy, Value: cloudformation }
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerPreferred

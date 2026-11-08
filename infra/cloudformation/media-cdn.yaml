@@ -77,6 +77,13 @@ Resources:
     Properties:
       Name: !Sub ${AWS::StackName}-media
       Scope: CLOUDFRONT
+      Tags:
+        - { Key: Project, Value: mediawiki-ami }
+        - { Key: Component, Value: cdn }
+        - { Key: Environment, Value: prod }
+        - { Key: Owner, Value: it-volunteers }
+        - { Key: Workspace, Value: org-wide }
+        - { Key: ManagedBy, Value: cloudformation }
       DefaultAction:
         Allow: {}
       VisibilityConfig:
@@ -217,6 +224,13 @@ Resources:
   Distribution:
     Type: AWS::CloudFront::Distribution
     Properties:
+      Tags:
+        - { Key: Project, Value: mediawiki-ami }
+        - { Key: Component, Value: cdn }
+        - { Key: Environment, Value: prod }
+        - { Key: Owner, Value: it-volunteers }
+        - { Key: Workspace, Value: org-wide }
+        - { Key: ManagedBy, Value: cloudformation }
       DistributionConfig:
         Enabled: true
         Comment: !Sub ${AWS::StackName} wiki media

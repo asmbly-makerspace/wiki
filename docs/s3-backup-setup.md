@@ -38,6 +38,18 @@ aws s3api put-public-access-block \
     "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 ```
 
+### Tag the bucket
+
+Apply the same billing tags as the wiki server so backup storage is counted as a
+wiki expense. Run this on an existing bucket too. `put-bucket-tagging` replaces
+the bucket's whole tag set, so include any other tags you want to keep.
+
+```bash
+aws s3api put-bucket-tagging --bucket "${BACKUP_BUCKET}" --tagging 'TagSet=[
+  {Key=Project,Value=mediawiki-ami},{Key=Component,Value=backups},{Key=Environment,Value=prod},
+  {Key=Owner,Value=it-volunteers},{Key=Workspace,Value=org-wide},{Key=ManagedBy,Value=manual}]'
+```
+
 ---
 
 ## Step 3 — Enable versioning (optional but recommended)
