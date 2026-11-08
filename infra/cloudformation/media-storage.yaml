@@ -1,0 +1,168 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  MediaWiki uploads, storage half: private S3 bucket and the IAM policy for the
+  wiki instance role (Extension:AWS). Served via the CloudFront stack in media-cdn.yaml.
+
+# Deploy in the wiki's region (us-east-2):
+#   aws cloudformation deploy --region us-east-2 --stack-name wiki-media-storage \
+#     --template-file infra/cloudformation/media-storage.yaml \
+#     --capabilities CAPABILITY_IAM \
+#     --parameter-overrides InstanceRoleName=<wiki-ec2-role>
+# Then deploy media-cdn.yaml (us-east-1) with the BucketRegionalDomainName
+# output, and re-run this stack with DistributionId=<DistributionId output> to
+# restrict bucket reads to that distribution.
+#
+# LocalSettings.php (after installing Extension:AWS and syncing images/):
+#   wfLoadExtension( 'AWS' );
+#   $wgAWSRegion = 'us-east-2';
+#   $wgAWSBucketName = 'asmbly-media';       # = BucketName
+#   $wgAWSBucketTopSubdirectory = '/wiki';   # = MediaPrefix; URLs become cdn.asmbly.org/wiki/...
+#   $wgAWSBucketDomain = 'cdn.asmbly.org';
+#   $wgAWSRepoHashLevels = '2';
+#   $wgAWSRepoDeletedHashLevels = '3';
+#
+# One bucket and CDN hostname are shared by several sites, each under its own
+# prefix: wiki/ (read-write from the wiki instance) and classes/ (served by
+# CloudFront only; the wiki instance has no access to it). Seed existing files with:
+#   aws s3 sync images/ s3://asmbly-media/wiki/ --exclude 'thumb/*' --exclude 'temp/*'
+#
+# Extension:AWS uploads with ACL public-read. The bucket accepts those ACLs but
+# IgnorePublicAcls makes S3 disregard them, so objects are only readable via
+# CloudFront. Versioning is the recovery path for deleted/overwritten files,
+# replacing the images/ tarball in the nightly backup.
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: asmbly-media
+    Description: Globally unique bucket name. Hard-coded in config/mediawiki/LocalSettings.php ($wgAWSBucketName).
+  MediaPrefix:
+    Type: String
+    Default: wiki
+    AllowedPattern: ^[a-z0-9][a-z0-9-]*$
+    Description: Key prefix for the wiki's files (no slashes). Must match $wgAWSBucketTopSubdirectory.
+  ClassesPrefix:
+    Type: String
+    Default: classes
+    AllowedPattern: ^[a-z0-9][a-z0-9-]*$
+    Description: Key prefix for the Classes site's files. Served by CloudFront; no write access is granted here.
+  DistributionId:
+    Type: String
+    Default: "*"
+    Description: CloudFront distribution ID allowed to read the bucket. "*" allows any distribution in this account (use for the first deploy only).
+  InstanceRoleName:
+    Type: String
+    Default: ""
+    Description: Existing IAM role of the wiki EC2 instance to attach the upload policy to. Leave empty to attach manually.
+  NoncurrentVersionDays:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    Description: Days to keep overwritten or deleted file versions.
+
+Conditions:
+  AttachToRole: !Not [!Equals [!Ref InstanceRoleName, ""]]
+
+Resources:
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref BucketName
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: !Ref NoncurrentVersionDays
+            ExpiredObjectDeleteMarker: true
+          - Id: abort-incomplete-uploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  MediaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MediaBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource:
+              - !Sub ${MediaBucket.Arn}/${MediaPrefix}/*
+              - !Sub ${MediaBucket.Arn}/${ClassesPrefix}/*
+            Condition:
+              StringLike:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${DistributionId}
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !GetAtt MediaBucket.Arn
+              - !Sub ${MediaBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+  UploadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Lets the wiki instance read/write its media bucket (Extension:AWS).
+      Roles: !If [AttachToRole, [!Ref InstanceRoleName], !Ref "AWS::NoValue"]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ObjectReadWrite
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:PutObjectAcl
+              - s3:DeleteObject
+              - s3:AbortMultipartUpload
+            Resource: !Sub ${MediaBucket.Arn}/${MediaPrefix}/*
+          - Sid: BucketList
+            Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt MediaBucket.Arn
+            Condition:
+              StringLike:
+                s3:prefix: [!Sub "${MediaPrefix}/*", !Ref MediaPrefix]
+          - Sid: BucketMeta
+            Effect: Allow
+            Action:
+              - s3:GetBucketLocation
+              - s3:ListBucketMultipartUploads
+            Resource: !GetAtt MediaBucket.Arn
+
+Outputs:
+  BucketName:
+    Description: Value for $wgAWSBucketName
+    Value: !Ref MediaBucket
+  BucketRegionalDomainName:
+    Description: Origin for media-cdn.yaml
+    Value: !GetAtt MediaBucket.RegionalDomainName
+  UploadPolicyArn:
+    Description: Attach to the wiki instance role if InstanceRoleName was left empty
+    Value: !Ref UploadPolicy

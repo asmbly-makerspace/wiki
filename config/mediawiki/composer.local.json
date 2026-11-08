@@ -57,6 +57,7 @@
     ],
     "require": {
         "mediawiki/template-styles": "dev-REL1_43",
+        "edwardspec/mediawiki-aws-s3": "0.14.0",
         "mediawiki/json-config": "dev-REL1_43",
         "mediawiki/wiki-category-tag-cloud": "dev-REL1_43",
         "mediawiki/description2": "dev-REL1_43",
