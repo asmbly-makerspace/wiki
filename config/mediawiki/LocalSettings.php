@@ -108,6 +108,21 @@ $wgUploadDirectory = "$IP/images";
 $wgMaxUploadSize   = 104857600;   # 100 MiB
 $wgMaxImageArea    = 6.4e7;
 
+# Uploads, thumbnails and deleted files live in S3 and are served through
+# CloudFront at https://cdn.asmbly.org/wiki/... (infra/cloudformation/media-*.yaml).
+# Credentials come from the EC2 instance role. The bucket is shared with the
+# Classes site, so every key is under the wiki/ prefix.
+wfLoadExtension( 'AWS' );
+$wgAWSRegion                = 'us-east-2';
+$wgAWSBucketName            = 'asmbly-media';
+$wgAWSBucketTopSubdirectory = '/wiki';
+$wgAWSBucketDomain          = 'cdn.asmbly.org';
+$wgAWSRepoHashLevels        = '2';
+$wgAWSRepoDeletedHashLevels = '3';
+# Upload with ACL private (default is public-read, which the bucket blocks).
+# Files are still public through CloudFront; this doesn't change URLs.
+$wgFileBackends['s3']['privateWiki'] = true;
+
 # Same additional types as 1.35 server
 $wgFileExtensions = array_merge(
     $wgFileExtensions,

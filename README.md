@@ -323,7 +323,8 @@ configured in core's `composer.json`.
   TextExtracts, Thanks, TitleBlacklist, VisualEditor, WikiEditor
 - **Installed via Composer** (`composer.local.json`): DiscourseSsoConsumer
   (→ PluggableAuth), IFrameTag, TemplateStyles, JsonConfig, PluggableAuth,
-  WikiCategoryTagCloud, Description2
+  WikiCategoryTagCloud, Description2, AWS (uploads in S3 via CloudFront; see
+  `infra/cloudformation/`)
 
   > TemplateStyles, JsonConfig, WikiCategoryTagCloud, and Description2 are declared as
   > `"package"` repositories (not `"vcs"`) because their upstream

@@ -1,0 +1,271 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  MediaWiki uploads, delivery half: CloudFront (OAC to the S3 bucket from
+  media-storage.yaml), CloudFront-scope WAF rate limits, and the Pro flat-rate plan.
+
+# CloudFront-scope WAF and its ACM certificate only exist in us-east-1, so this
+# stack must be deployed there; the bucket stays in the wiki's region (us-east-2).
+#   1. Deploy media-storage.yaml in us-east-2 first.
+#   2. Request an ACM certificate for cdn.asmbly.org in us-east-1 and add its
+#      DNS validation CNAME.
+#   3. aws cloudformation deploy --region us-east-1 --stack-name wiki-media-cdn \
+#        --template-file infra/cloudformation/media-cdn.yaml \
+#        --parameter-overrides CertificateArn=<arn> \
+#          BucketRegionalDomainName=<media-storage output>
+#   4. Create the DNS CNAME cdn.asmbly.org -> DistributionDomain output.
+#   5. Re-deploy media-storage.yaml with DistributionId=<DistributionId output>.
+#   6. Approve the Pro subscription (CloudFormation creates it PENDING_APPROVAL,
+#      billed pay-as-you-go until approved):
+#        arn=<SubscriptionArn output>
+#        etag=$(aws pricing-plan-manager get-subscription --region us-east-1 \
+#          --arn "$arn" --query eTag --output text)
+#        aws pricing-plan-manager approve-paid-subscription --region us-east-1 \
+#          --arn "$arn" --if-match "$etag"
+#
+# Billing: the distribution is subscribed to the CloudFront PRO flat-rate plan
+# ($15/mo, WAF ACL included, no overage charges). Its allowances are 10M requests
+# and 50 TB per month; they are guidance, not hard limits, and AWS emails at
+# 50/80/100%. Below Business tier only AWS-managed cache/response-header policies
+# are allowed, so robots.txt and Cache-Control come from CloudFront Functions.
+# Pro allows 25 WAF rules. The tier can't change through a stack update; change it
+# with the PricingPlanManager API, then update PlanTier here to match.
+
+Parameters:
+  CustomDomainName:
+    Type: String
+    Default: cdn.asmbly.org
+    Description: Media hostname. Create the CNAME to the DistributionDomain output manually.
+  CertificateArn:
+    Type: String
+    AllowedPattern: ^arn:aws[a-zA-Z-]*:acm:us-east-1:\d{12}:certificate/.+$
+    Description: ACM certificate ARN (us-east-1) covering CustomDomainName.
+  BucketRegionalDomainName:
+    Type: String
+    AllowedPattern: ^[a-z0-9.-]+\.s3\.[a-z0-9-]+\.amazonaws\.com$
+    Description: BucketRegionalDomainName output of the media-storage stack.
+  RateLimitAll:
+    Type: Number
+    Default: 1000
+    MinValue: 10
+    Description: Max requests per IP per 5 minutes for any file.
+  RateLimitPdf:
+    Type: Number
+    Default: 300
+    MinValue: 10
+    Description: >-
+      Max PDF requests per IP per 5 minutes. Browser PDF viewers fetch one file as
+      many Range requests, and makerspace members share one IP, so keep this high.
+
+Rules:
+  MustBeUsEast1:
+    Assertions:
+      - Assert: !Equals [!Ref "AWS::Region", us-east-1]
+        AssertDescription: Deploy in us-east-1 (CloudFront-scope WAF requirement).
+
+Resources:
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub ${AWS::StackName}-media
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  WebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub ${AWS::StackName}-media
+      Scope: CLOUDFRONT
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        CloudWatchMetricsEnabled: true
+        SampledRequestsEnabled: true
+        MetricName: !Sub ${AWS::StackName}-media
+      Rules:
+        - Name: rate-limit-pdf
+          Priority: 0
+          Action:
+            Block: {}
+          VisibilityConfig:
+            CloudWatchMetricsEnabled: true
+            SampledRequestsEnabled: true
+            MetricName: !Sub ${AWS::StackName}-rate-limit-pdf
+          Statement:
+            RateBasedStatement:
+              Limit: !Ref RateLimitPdf
+              EvaluationWindowSec: 300
+              AggregateKeyType: IP
+              ScopeDownStatement:
+                ByteMatchStatement:
+                  SearchString: .pdf
+                  PositionalConstraint: ENDS_WITH
+                  FieldToMatch:
+                    UriPath: {}
+                  TextTransformations:
+                    - Priority: 0
+                      Type: LOWERCASE
+        - Name: rate-limit-all
+          Priority: 1
+          Action:
+            Block: {}
+          VisibilityConfig:
+            CloudWatchMetricsEnabled: true
+            SampledRequestsEnabled: true
+            MetricName: !Sub ${AWS::StackName}-rate-limit-all
+          Statement:
+            RateBasedStatement:
+              Limit: !Ref RateLimitAll
+              EvaluationWindowSec: 300
+              AggregateKeyType: IP
+
+  # Crawlers read robots.txt per host; the wiki's robots.txt doesn't cover this one.
+  # Same agent groups as config/mediawiki/robots.txt. Thumbnails and PDFs are open to
+  # all; full-size originals only to Googlebot-Image (Google Images, og:image, and
+  # images embedded at original size). No Crawl-delay: CloudFront, not the wiki, serves these.
+  RobotsFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub ${AWS::StackName}-robots
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Serve robots.txt for wiki media
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        var ROBOTS = [
+          '# robots.txt for cdn.asmbly.org (wiki uploads)',
+          '# Source: infra/cloudformation/media-cdn.yaml in the wiki repo.',
+          '# Same policy as wiki.asmbly.org/robots.txt: retrieval/search and',
+          '# training bots are allowed.',
+          '',
+          '# Retrieval / search bots',
+          'User-agent: OAI-SearchBot',
+          'User-agent: ChatGPT-User',
+          'User-agent: Claude-SearchBot',
+          'User-agent: Claude-User',
+          'User-agent: PerplexityBot',
+          'User-agent: Perplexity-User',
+          'User-agent: Bingbot',
+          'User-agent: Googlebot',
+          '# Training bots',
+          'User-agent: GPTBot',
+          'User-agent: ClaudeBot',
+          'User-agent: Google-Extended',
+          'User-agent: Applebot-Extended',
+          'User-agent: CCBot',
+          'User-agent: *',
+          '',
+          '# Full-size image originals are large; crawlers get the thumbnails',
+          '# embedded in pages. PDFs stay crawlable as indexable documents.',
+          '# The longer Allow wins over Disallow (RFC 9309).',
+          'Disallow: /wiki/',
+          'Allow: /wiki/thumb/',
+          'Allow: /*.pdf$',
+          'Allow: /*.PDF$',
+          '',
+          '# Google Images indexes the originals that pages and og:image link to.',
+          'User-agent: Googlebot-Image',
+          'Allow: /',
+          ''
+        ].join('\n');
+
+        function handler(event) {
+          var request = event.request;
+          if (request.uri !== '/robots.txt') {
+            return request;
+          }
+          return {
+            statusCode: 200,
+            statusDescription: 'OK',
+            headers: {
+              'content-type': { value: 'text/plain; charset=utf-8' },
+              'cache-control': { value: 'public, max-age=86400' }
+            },
+            body: ROBOTS
+          };
+        }
+
+  # Same lifetimes the wiki's Apache served for /images (config/httpd/mediawiki.conf).
+  # Re-uploads keep the same URL, so originals stay short-lived.
+  CacheControlFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub ${AWS::StackName}-cache-control
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Set browser Cache-Control on media
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var response = event.response;
+          var code = response.statusCode;
+          if (code !== 200 && code !== 206 && code !== 304) {
+            return response;
+          }
+          var uri = event.request.uri.toLowerCase();
+          var value = 'public, max-age=86400, stale-while-revalidate=86400';
+          if (uri.indexOf('/thumb/') !== -1) {
+            value = 'public, max-age=2592000';
+          } else if (/\.(pdf|zip|stl|step|dxf)$/.test(uri)) {
+            value = 'public, max-age=604800';
+          }
+          response.headers['cache-control'] = { value: value };
+          return response;
+        }
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub ${AWS::StackName} wiki media
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        WebACLId: !GetAtt WebAcl.Arn
+        Aliases: [!Ref CustomDomainName]
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        Origins:
+          - Id: media-bucket
+            DomainName: !Ref BucketRegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: media-bucket
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          # AWS-managed: CachingOptimized and SimpleCORS (Pro plan allows only managed policies)
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: 60669652-455b-4ae9-85a4-c4c02393f86c
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt RobotsFunction.FunctionMetadata.FunctionARN
+            - EventType: viewer-response
+              FunctionARN: !GetAtt CacheControlFunction.FunctionMetadata.FunctionARN
+
+  PricingPlan:
+    Type: AWS::PricingPlanManager::Subscription
+    Properties:
+      PlanFamily: CloudFront
+      PlanTier: PRO
+      UsageLevel: DEFAULT
+      ResourceArns:
+        - !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}
+        - !GetAtt WebAcl.Arn
+
+Outputs:
+  DistributionId:
+    Description: Pass to media-storage.yaml as DistributionId
+    Value: !Ref Distribution
+  DistributionDomain:
+    Description: CNAME target for CustomDomainName
+    Value: !GetAtt Distribution.DomainName
+  SubscriptionArn:
+    Description: Pricing plan subscription to approve (see step 6)
+    Value: !Ref PricingPlan
