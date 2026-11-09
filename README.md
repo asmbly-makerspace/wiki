@@ -48,7 +48,7 @@ recent and complete:
 ```bash
 LATEST=$(aws s3 cp "s3://${BACKUP_BUCKET}/backups/latest.txt" -)
 echo "$LATEST"                                       # should be within the last day or two
-aws s3 ls "s3://${BACKUP_BUCKET}/backups/${LATEST}/"   # DB dump, images, config archives, manifest.txt
+aws s3 ls "s3://${BACKUP_BUCKET}/backups/${LATEST}/"   # DB dump, config archive, manifest.txt
 aws s3 cp "s3://${BACKUP_BUCKET}/backups/${LATEST}/manifest.txt" -   # sizes and sha256 for each file
 ```
 
@@ -154,6 +154,23 @@ sudo BACKUP_BUCKET=asmbly-wiki-backups-110104886034-us-east-2-an \
   BACKUP_TIMESTAMP=weekly/2026-W24 \
   bash /opt/mediawiki-ami/restore.sh
 ```
+
+
+### Seed the media bucket (first time only)
+
+Uploads are served from S3/CloudFront (`$wgAWSBucketName = asmbly-media`, prefix
+`wiki/`), not from `images/`. `restore.sh` only puts the backup's images
+archive on local disk, so copy them into the bucket once the media stack and
+CDN exist (Step 1). Skip this if the bucket already holds the files.
+
+```bash
+sudo aws s3 sync /var/www/mediawiki/images/ s3://asmbly-media/wiki/ \
+  --exclude 'thumb/*' --exclude 'temp/*' --region us-east-2
+aws s3 ls s3://asmbly-media/wiki/ | head      # spot-check; then load a file page on the wiki
+```
+
+Thumbnails are regenerated on demand. The instance role needs the stack's
+`UploadPolicy` (Step 4) to write to the bucket.
 
 ---
 

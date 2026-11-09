@@ -229,14 +229,16 @@ sudo BACKUP_BUCKET=my-mediawiki-backups \
 
 ## Cost estimate
 
-Assuming ~1.7 GB per backup (1.4 GB images + 185 MB DB + config):
+Assuming ~0.2 GB per backup (185 MB DB + config). Uploaded media is not in
+these backups; it lives in the versioned media bucket
+(`infra/cloudformation/media-storage.yaml`).
 
 | Tier | Copies | Storage class | Size | $/month (approx) |
 |------|--------|--------------|------|-----------------|
-| Daily | 1–2 | STANDARD | ~1.7 GB | < $0.05 |
-| Weekly | 8 | STANDARD → IA | ~13.6 GB | ~$0.20 |
-| Monthly | 12 | STANDARD → IA → Glacier | ~20.4 GB | ~$0.15 |
-| **Total** | | | ~36 GB | **~$0.40/month** |
+| Daily | 5 | STANDARD | ~1 GB | ~$0.02 |
+| Weekly | 8 | STANDARD → IA | ~1.6 GB | ~$0.03 |
+| Monthly | 12 | STANDARD → IA → Glacier | ~2.4 GB | ~$0.02 |
+| **Total** | | | ~5 GB | **~$0.07/month** |
 
 _Prices based on us-east-2: STANDARD $0.023/GB, STANDARD_IA $0.0125/GB, GLACIER_IR $0.004/GB._
 

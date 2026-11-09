@@ -194,7 +194,9 @@ Resources:
         }
 
   # Same lifetimes the wiki's Apache served for /images (config/httpd/mediawiki.conf).
-  # Re-uploads keep the same URL, so originals stay short-lived.
+  # Re-uploads keep the same URL, so originals stay short-lived. The classes site
+  # sets Cache-Control on its own objects (immutable hashed files, short-lived
+  # manifests), so it is kept as-is under /classes/.
   CacheControlFunction:
     Type: AWS::CloudFront::Function
     Properties:
@@ -211,6 +213,9 @@ Resources:
             return response;
           }
           var uri = event.request.uri.toLowerCase();
+          if (uri.indexOf('/classes/') === 0 && response.headers['cache-control']) {
+            return response;
+          }
           var value = 'public, max-age=86400, stale-while-revalidate=86400';
           if (uri.indexOf('/thumb/') !== -1) {
             value = 'public, max-age=2592000';

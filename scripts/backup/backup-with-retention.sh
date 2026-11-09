@@ -142,19 +142,10 @@ mysqldump \
 UPLOADED+=("${DB_NAME}")
 log "  DB dump: $(tr -d ' ' < "${WORK_DIR}/${DB_NAME}.bytes") bytes"
 
-# ── Step 2: Stream images archive to daily/ ─────────────────────────────────
-log "--- Archiving images → ${DAILY_PREFIX}/ ---"
-if [ -d "${MW_ROOT}/images" ]; then
-  IMAGES_NAME="mediawiki-images-${TIMESTAMP}.tar.gz"
-  # gzip -1: images are mostly already-compressed media; higher levels just burn CPU.
-  tar -cf - -C "${MW_ROOT}" images/ | gzip -1 | stream_to_s3 "${IMAGES_NAME}"
-  UPLOADED+=("${IMAGES_NAME}")
-  log "  Images: $(tr -d ' ' < "${WORK_DIR}/${IMAGES_NAME}.bytes") bytes"
-else
-  log "  WARNING: images/ not found — skipping"
-fi
+# Uploads are not archived: they live in the versioned media bucket
+# (infra/cloudformation/media-storage.yaml).
 
-# ── Step 3: Stream config archive to daily/ ─────────────────────────────────
+# ── Step 2: Stream config archive to daily/ ─────────────────────────────────
 log "--- Archiving config → ${DAILY_PREFIX}/ ---"
 CONFIG_NAME="mediawiki-config-${TIMESTAMP}.tar.gz"
 CONFIG_FILES=("${MW_ROOT}/LocalSettings.php")
@@ -165,7 +156,7 @@ done
 UPLOADED+=("${CONFIG_NAME}")
 log "  Config: $(tr -d ' ' < "${WORK_DIR}/${CONFIG_NAME}.bytes") bytes"
 
-# ── Step 4: Upload manifest ──────────────────────────────────────────────────
+# ── Step 3: Upload manifest ──────────────────────────────────────────────────
 MANIFEST="${WORK_DIR}/manifest.txt"
 {
   echo "timestamp=${TIMESTAMP}"
@@ -178,7 +169,7 @@ aws s3 cp "${MANIFEST}" "s3://${BACKUP_BUCKET}/backups/${DAILY_PREFIX}/manifest.
   --region "${AWS_REGION}" --no-progress --storage-class STANDARD
 UPLOADED+=("manifest.txt")
 
-# ── Step 5: Point latest.txt at this run ─────────────────────────────────────
+# ── Step 4: Point latest.txt at this run ─────────────────────────────────────
 # Only reached after every object uploaded successfully. Old daily/ runs are
 # expired by S3 Lifecycle (see docs/lifecycle.json).
 echo "${DAILY_PREFIX}" | aws s3 cp - "s3://${BACKUP_BUCKET}/backups/latest.txt" \
@@ -198,7 +189,7 @@ promote() {
   done
 }
 
-# ── Step 6: Promote to WEEKLY tier (Sundays) ─────────────────────────────────
+# ── Step 5: Promote to WEEKLY tier (Sundays) ─────────────────────────────────
 # S3 Lifecycle transitions to STANDARD_IA after 14 days, expires after 57 days.
 if [ "${DOW}" = "7" ]; then
   log "--- Sunday: promoting to weekly/${WEEK_NUM}/ ---"
@@ -206,7 +197,7 @@ if [ "${DOW}" = "7" ]; then
   log "  Weekly backup stored: ${WEEK_NUM}"
 fi
 
-# ── Step 7: Promote to MONTHLY tier (1st of month) ───────────────────────────
+# ── Step 6: Promote to MONTHLY tier (1st of month) ───────────────────────────
 # S3 Lifecycle transitions to STANDARD_IA after 30 days, GLACIER_IR after 90 days,
 # and expires after 366 days.
 if [ "${DOM}" = "01" ]; then

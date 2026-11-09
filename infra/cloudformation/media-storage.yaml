@@ -43,8 +43,12 @@ Description: >-
 #   $wgFileBackends['s3']['privateWiki'] = true;  # upload with ACL private
 #
 # One bucket and CDN hostname are shared by several sites, each under its own
-# prefix: wiki/ (read-write from the wiki instance) and classes/ (served by
-# CloudFront only; the wiki instance has no access to it). Seed existing files with:
+# prefix: wiki/ (read-write from the wiki instance) and classes/ (the wiki
+# instance has no access to it). Writers to classes/ (CI, staff, thumbnailer)
+# are granted by the classes-media stack in the asmbly-classes repo, which
+# consumes this bucket's EventBridge events. Staff-uploaded originals under
+# classes/images/src/ are not served; only the generated variants are.
+# Seed existing files with:
 #   aws s3 sync images/ s3://asmbly-media/wiki/ --exclude 'thumb/*' --exclude 'temp/*'
 #
 # Objects are private and only readable via CloudFront. Extension:AWS normally
@@ -68,7 +72,7 @@ Parameters:
     Type: String
     Default: classes
     AllowedPattern: ^[a-z0-9][a-z0-9-]*$
-    Description: Key prefix for the Classes site's files. Served by CloudFront; no write access is granted here.
+    Description: Key prefix for the Classes site's files. Served by CloudFront; write access is granted by the classes-media stack.
   DistributionId:
     Type: String
     Default: "*"
@@ -130,6 +134,10 @@ Resources:
               SSEAlgorithm: AES256
       VersioningConfiguration:
         Status: Enabled
+      # Drives the classes image thumbnailer (classes-media stack).
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
       LifecycleConfiguration:
         Rules:
           - Id: expire-old-versions
@@ -228,6 +236,7 @@ Resources:
             Resource:
               - !Sub ${MediaBucket.Arn}/${MediaPrefix}/deleted/*
               - !Sub ${MediaBucket.Arn}/${MediaPrefix}/temp/*
+              - !Sub ${MediaBucket.Arn}/${ClassesPrefix}/images/src/*
           - Sid: DenyInsecureTransport
             Effect: Deny
             Principal: "*"
