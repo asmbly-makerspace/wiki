@@ -39,6 +39,11 @@ aws s3api put-public-access-block --bucket "${BACKUP_BUCKET}" \
   --public-access-block-configuration \
   "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 
+# Tag for billing (run on an existing bucket too; replaces any existing tags)
+aws s3api put-bucket-tagging --bucket "${BACKUP_BUCKET}" --tagging 'TagSet=[
+  {Key=Project,Value=mediawiki-ami},{Key=Component,Value=backups},{Key=Environment,Value=prod},
+  {Key=Owner,Value=it-volunteers},{Key=Workspace,Value=org-wide},{Key=ManagedBy,Value=manual}]'
+
 # Apply GFS retention rules (daily: 2d, weekly: 57d, monthly: 366d)
 aws s3api put-bucket-lifecycle-configuration \
   --bucket "${BACKUP_BUCKET}" \
