@@ -1,56 +1,64 @@
 # mediawiki-ami
 
-Tooling to **back up** an existing MediaWiki 1.35 server and **build a new AWS AMI** running MediaWiki 1.43 on Amazon Linux 2023 (aarch64 / Graviton).
+Infrastructure, AMI build tooling and runbooks for **maintaining and upgrading the ASMBLY wiki** (MediaWiki 1.43.9 on Amazon Linux 2023, aarch64 / Graviton). The original 1.35 server has been retired.
 
 ---
 
 ## Prerequisites
 
-## Step 1 — Inventory & back up the existing server
+## Step 1 — Check the infrastructure stack
 
-Run on the **old (1.35) server** as root:
+The S3 buckets (media and backups) and the wiki instance's S3 IAM policy are
+defined in [`infra/cloudformation/media-storage.yaml`](infra/cloudformation/media-storage.yaml)
+(stack `wiki-media-storage`, us-east-2). The CDN is in `media-cdn.yaml` (us-east-1).
 
 ```bash
-sudo bash scripts/inventory/gather-info.sh | tee output/server-inventory.txt
-
-export BACKUP_BUCKET=my-mediawiki-backups
 export AWS_REGION=us-east-2
-bash scripts/backup/full-backup.sh
+export BACKUP_BUCKET=asmbly-wiki-backups-110104886034-us-east-2-an
+
+aws cloudformation describe-stacks --region "$AWS_REGION" --stack-name wiki-media-storage \
+  --query 'Stacks[0].StackStatus' --output text      # expect CREATE_COMPLETE / UPDATE_COMPLETE
+aws s3api head-bucket --bucket "$BACKUP_BUCKET"      # backup bucket exists
+aws s3api head-bucket --bucket asmbly-media          # media bucket exists
 ```
 
-The full backup uploads DB dump + images + config to `s3://$BACKUP_BUCKET/backups/<timestamp>/`.
+**First time only** (stack does not exist): deploy it, then deploy `media-cdn.yaml`
+and re-run this stack with the `DistributionId` output, as described in the header
+of the template.
+
+```bash
+aws cloudformation deploy --region us-east-2 --stack-name wiki-media-storage \
+  --template-file infra/cloudformation/media-storage.yaml \
+  --capabilities CAPABILITY_IAM \
+  --parameter-overrides InstanceRoleName=<wiki-ec2-role>
+```
+
+If the backup bucket already exists but is not yet in the stack, import it first
+with the one-time import change set in the template header (a normal deploy fails with "already exists"). The stack owns the bucket's lifecycle rules, tags,
+versioning and the instance's backup IAM permissions. See
+[docs/s3-backup-setup.md](docs/s3-backup-setup.md) for the equivalent manual steps.
 
 ---
 
-## Step 2 — Configure the S3 bucket (one-time)
+## Step 2 — Check for a recent, complete backup
 
-Apply lifecycle rules so AWS automatically expires old backups.
-Only needs to be done once per bucket — not per server launch.
+Before building, launching or upgrading anything, confirm the latest backup is
+recent and complete:
 
 ```bash
-export BACKUP_BUCKET=my-mediawiki-backups
-export AWS_REGION=us-east-2
-
-# Create bucket (skip if it exists)
-aws s3api create-bucket --bucket "${BACKUP_BUCKET}" --region "${AWS_REGION}" \
-  --create-bucket-configuration LocationConstraint="${AWS_REGION}"
-
-aws s3api put-public-access-block --bucket "${BACKUP_BUCKET}" \
-  --public-access-block-configuration \
-  "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
-
-# Tag for billing (run on an existing bucket too; replaces any existing tags)
-aws s3api put-bucket-tagging --bucket "${BACKUP_BUCKET}" --tagging 'TagSet=[
-  {Key=Project,Value=mediawiki-ami},{Key=Component,Value=backups},{Key=Environment,Value=prod},
-  {Key=Owner,Value=it-volunteers},{Key=Workspace,Value=org-wide},{Key=ManagedBy,Value=manual}]'
-
-# Apply GFS retention rules (daily: 2d, weekly: 57d, monthly: 366d)
-aws s3api put-bucket-lifecycle-configuration \
-  --bucket "${BACKUP_BUCKET}" \
-  --lifecycle-configuration file://docs/lifecycle.json
+LATEST=$(aws s3 cp "s3://${BACKUP_BUCKET}/backups/latest.txt" -)
+echo "$LATEST"                                       # should be within the last day or two
+aws s3 ls "s3://${BACKUP_BUCKET}/backups/${LATEST}/"   # DB dump, images, config archives, manifest.txt
+aws s3 cp "s3://${BACKUP_BUCKET}/backups/${LATEST}/manifest.txt" -   # sizes and sha256 for each file
 ```
 
-See [docs/s3-backup-setup.md](docs/s3-backup-setup.md) for the full setup including IAM policy.
+`latest.txt` is only updated after every file and the manifest uploaded
+successfully, so a stale value means the nightly backup is failing — check
+`/var/log` on the server before proceeding. If needed, take one now:
+
+```bash
+sudo BACKUP_BUCKET="$BACKUP_BUCKET" bash /opt/mediawiki-ami/backup-with-retention.sh
+```
 
 ---
 
@@ -100,14 +108,14 @@ You can also trigger it manually from the Actions UI with an optional dry-run.
 
 ## Step 4 — Launch the new instance
 
-1. Launch an EC2 instance from the new AMI (t4g.medium, us-east-2, same VPC as old server)
-2. Attach an IAM instance profile with `s3:GetObject` + `s3:ListBucket` on `$BACKUP_BUCKET`,
-   plus the AWS-managed `CloudWatchAgentServerPolicy` (see
+1. Launch an EC2 instance from the new AMI (t4g.medium, us-east-2, same VPC as the current server)
+2. Attach an instance profile whose role is the stack's `InstanceRoleName` (it gets the
+   media and backup S3 permissions from `UploadPolicy`), plus the AWS-managed `CloudWatchAgentServerPolicy` (see
    [docs/s3-backup-setup.md](docs/s3-backup-setup.md#step-5--iam-policy-for-the-ec2-instance-profile)) —
    the CloudWatch agent is already installed, configured, and enabled at boot by the AMI;
    it just needs permission to publish.
-3. Attach the same Elastic IP / security groups as the old server (but do **not** move the EIP yet)
-4. Tag the new instance and its root volume. AWS doesn't copy tags from the old
+3. Attach the same security groups as the current server (but do **not** move the Elastic IP yet)
+4. Tag the new instance and its root volume. AWS doesn't copy tags from the current
    server, so without this step the wiki's server cost shows up as untagged in the
    AWS bill and can't be tracked as a wiki expense.
 
@@ -132,17 +140,17 @@ SSH into the new instance as `ec2-user`, then:
 
 ```bash
 # Restore DB + images from S3
-sudo BACKUP_BUCKET=my-mediawiki-backups \
+sudo BACKUP_BUCKET=asmbly-wiki-backups-110104886034-us-east-2-an \
   bash /opt/mediawiki-ami/restore.sh
 
-# Run the one-time 1.35 → 1.43 schema migration
+# Run update.php if the new AMI has a newer MediaWiki than the backup
 sudo bash /opt/mediawiki-ami/upgrade-1.35-to-1.43.sh
 ```
 
 To restore from a specific backup rather than the latest daily:
 
 ```bash
-sudo BACKUP_BUCKET=my-mediawiki-backups \
+sudo BACKUP_BUCKET=asmbly-wiki-backups-110104886034-us-east-2-an \
   BACKUP_TIMESTAMP=weekly/2026-W24 \
   bash /opt/mediawiki-ami/restore.sh
 ```
@@ -171,10 +179,10 @@ When satisfied:
 
 1. Move the Elastic IP to the new instance
 2. Confirm DNS resolves to the new instance (`dig wiki.asmbly.org`)
-3. Keep the old instance **stopped** (not terminated) for 72 hours as a rollback option
-4. Change the old instance's `Component` tag (and its volume's) to `retired-server`.
+3. Keep the previous instance **stopped** (not terminated) for 72 hours as a rollback option
+4. Change the previous instance's `Component` tag (and its volume's) to `retired-server`.
    Stopped servers still cost money for their disks, and this tag makes that cost
-   easy to find in the bill until the old instance is terminated:
+   easy to find in the bill until it is terminated:
 
    ```bash
    aws ec2 create-tags --resources "$OLD_INSTANCE_ID" "$OLD_VOLUME_ID" \
@@ -205,7 +213,7 @@ via `/etc/cron.d/mediawiki-backup`. It uploads to S3 with GFS rotation:
 
 | Tier | When | S3 prefix | Expires |
 |------|------|-----------|---------|
-| Daily | Every night | `backups/daily/<timestamp>/` | 2 days (S3 Lifecycle) |
+| Daily | Every night | `backups/daily/<timestamp>/` | 5 days (S3 Lifecycle) |
 | Weekly | Sundays | `backups/weekly/YYYY-WNN/` | 57 days (S3 Lifecycle) |
 | Monthly | 1st of month | `backups/monthly/YYYY-MM/` | 366 days (S3 Lifecycle) |
 
@@ -214,6 +222,10 @@ via `/etc/cron.d/mediawiki-backup`. It uploads to S3 with GFS rotation:
 ## Repository layout
 
 ```
+infra/cloudformation/
+  media-storage.yaml              ← Media + backup S3 buckets, instance IAM policy (us-east-2)
+  media-cdn.yaml                  ← CloudFront for media (us-east-1)
+
 config/
   cloudwatch/mediawiki-cwa.json   ← CloudWatch agent config (metrics + logs, installed & enabled at boot)
   cron/mediawiki-backup           ← Cron job definitions
@@ -238,7 +250,7 @@ config/
   system/sysctl.conf              ← Kernel tuning
 
 docs/
-  lifecycle.json                  ← S3 Lifecycle Rules (apply once to bucket)
+  lifecycle.json                  ← S3 Lifecycle Rules (also encoded in infra/cloudformation/media-storage.yaml)
   s3-backup-setup.md              ← Bucket setup walkthrough
   iam/README.md                   ← IAM setup guide
   iam/oidc-trust-policy.json      ← OIDC trust policy for GitHub Actions
@@ -268,8 +280,8 @@ packer-test/
   test.env.example                ← Copy → test.env and fill in
 
 scripts/
-  inventory/gather-info.sh          Server inventory report
-  backup/full-backup.sh             Full backup → S3 (run on old server)
+  inventory/gather-info.sh          Server inventory report (legacy)
+  backup/full-backup.sh             Full backup → S3 (legacy)
   backup/db-backup.sh               DB-only backup (legacy cron target)
   backup/backup-with-retention.sh   GFS backup with S3 Lifecycle retention (new server cron)
   backup/config-export.sh           Redacted config export → S3
